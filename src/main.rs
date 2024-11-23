@@ -127,4 +127,8 @@ fn main() {
     let raw_dir = config_dir.join(config["raw_dir"].as_str().unwrap());
 
     process_all_raw_dirs(&raw_dir, &repo);
+
+    // Remove the .git directory. This is only needed for the example so it tracks properly
+    std::fs::remove_dir_all(full_modpack_dir.join(".git"))
+        .expect("Failed to remove .git directory");
 }
