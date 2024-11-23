@@ -38,17 +38,11 @@ fn process_all_raw_dirs(raw_dir: &std::path::Path, repo: &Repository) {
             process_dir(&path, &path, repo);
         }
 
-        // Get the files added to the repo
-        let statuses = repo.statuses(None).unwrap();
-        for status in statuses.iter() {
-            println!("Is new?: {}", status.status().is_wt_new());
-        }
-
-        commit(repo, "Added new files");
+        commit_to_branch(repo, path.file_name().unwrap().to_str().unwrap());
     }
 }
 
-fn commit(repo: &Repository, commit_message: &str) -> git2::Oid {
+fn commit_to_branch(repo: &Repository, branch: &str) {
     // Get the index
     let mut index = repo.index().expect("Failed to get index");
 
@@ -74,15 +68,26 @@ fn commit(repo: &Repository, commit_message: &str) -> git2::Oid {
     let parent_commits: Vec<&git2::Commit> = parent_commits.iter().collect();
 
     // Create the commit
-    repo.commit(
-        Some("HEAD"),
-        &signature,
-        &signature,
-        commit_message,
-        &tree,
-        &parent_commits, // Use parent commits instead of empty slice
+    let commit_id = repo
+        .commit(
+            None, // Don't update HEAD yet
+            &signature,
+            &signature,
+            branch,
+            &tree,
+            &parent_commits,
+        )
+        .expect("Failed to commit");
+
+    let branch_name = branch.replace(" ", "-");
+
+    // Create a new branch pointing to this commit
+    repo.branch(
+        &branch_name,
+        &repo.find_commit(commit_id).expect("Failed to find commit"),
+        false,
     )
-    .expect("Failed to commit")
+    .expect("Failed to create branch");
 }
 
 fn main() {
@@ -118,17 +123,35 @@ fn main() {
     let repo: Repository = Repository::init(full_modpack_dir.clone())
         .expect("Failed to initialize modpack repository");
 
+    // Create an empty initial commit
+    let empty_tree_id = repo
+        .treebuilder(None)
+        .expect("Failed to create tree builder")
+        .write()
+        .expect("Failed to write empty tree");
+    let tree = repo
+        .find_tree(empty_tree_id)
+        .expect("Failed to find empty tree");
+
+    let signature = Signature::now("Strelok", "The Zone").expect("Failed to create signature");
+
+    repo.commit(
+        Some("HEAD"), // Update HEAD directly since this is the initial commit
+        &signature,
+        &signature,
+        "Initial empty commit",
+        &tree,
+        &[], // No parent commits for initial commit
+    )
+    .expect("Failed to create initial commit");
+
     println!("Repository: {}", repo.path().display());
-
-    let commit_id = commit(&repo, "Initial commit");
-
-    println!("Initial commit created: {}", commit_id);
 
     let raw_dir = config_dir.join(config["raw_dir"].as_str().unwrap());
 
     process_all_raw_dirs(&raw_dir, &repo);
 
-    // Remove the .git directory. This is only needed for the example so it tracks properly
-    std::fs::remove_dir_all(full_modpack_dir.join(".git"))
-        .expect("Failed to remove .git directory");
+    // // Remove the .git directory. This is only needed for the example so it tracks properly
+    // std::fs::remove_dir_all(full_modpack_dir.join(".git"))
+    //     .expect("Failed to remove .git directory");
 }
