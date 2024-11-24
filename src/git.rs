@@ -1,5 +1,5 @@
 use git2::{Error, FileFavor, MergeOptions, Repository};
-use std::path::Path;
+use std::{io::Read, path::Path};
 
 pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), Error> {
     // Try to find the branch first
@@ -47,15 +47,35 @@ pub fn merge_branch(repo: &Repository, from_branch: &str) -> Result<(), Error> {
     let head = repo.head()?;
     let head_commit = head.peel_to_commit()?;
 
-    // Set up merge options favoring "theirs"
-    let mut merge_opts = MergeOptions::new();
-    merge_opts.file_favor(FileFavor::Theirs);
-
     // get annotated commit from the from_commit
     let annotated_commit = repo.find_annotated_commit(from_commit.id())?;
 
-    // Perform the merge
-    repo.merge(&[&annotated_commit], Some(&mut merge_opts), None)?;
+    // Set up merge options with custom conflict handling
+    let mut merge_opts = MergeOptions::new();
+    merge_opts.file_favor(FileFavor::Normal);
+
+    // Perform the merge with options
+    repo.merge(&[&annotated_commit], Some(&mut merge_opts), None)
+        .expect("Failed to perform merge");
+
+    // Get conflicted files
+    let index = repo.index()?;
+    for entry in index.conflicts()? {
+        let conflict = entry?;
+
+        // Extract file paths for conflicting versions
+        let path = conflict
+            .our
+            .as_ref()
+            .map(|e| String::from_utf8_lossy(&e.path).to_string());
+        let our_id = conflict.our.as_ref().map(|e| e.id);
+        let their_id = conflict.their.as_ref().map(|e| e.id);
+
+        if let (Some(path), Some(our_id), Some(their_id)) = (path, our_id, their_id) {
+            handle_merge_conflict(repo, &path, our_id, their_id)?;
+        }
+    }
+
     // Create the merge commit
     let sig = repo.signature()?;
     let message = format!("Merge branch '{}'", from_branch);
@@ -75,6 +95,38 @@ pub fn merge_branch(repo: &Repository, from_branch: &str) -> Result<(), Error> {
     repo.cleanup_state()?;
 
     Ok(())
+}
+
+fn handle_merge_conflict(
+    repo: &Repository,
+    path: &str,
+    our_id: git2::Oid,
+    their_id: git2::Oid,
+) -> Result<(), Error> {
+    println!("Conflict in file: {}", path);
+
+    let our_blob = repo.find_blob(our_id)?;
+    let their_blob = repo.find_blob(their_id)?;
+
+    let mut our_buf = String::new();
+    our_blob
+        .content()
+        .read_to_string(&mut our_buf)
+        .expect("Failed to read our blob");
+
+    let mut their_buf = String::new();
+    their_blob
+        .content()
+        .read_to_string(&mut their_buf)
+        .expect("Failed to read their blob");
+
+    println!("Our blob: {:?}", our_buf);
+    println!("Their blob: {:?}", their_buf);
+
+    Err(Error::from_str(&format!(
+        "Failed to resolve conflict for file: {}",
+        path
+    )))
 }
 
 pub fn commit_files(repo: &Repository, message: &str, only_new: bool) -> Result<(), Error> {
