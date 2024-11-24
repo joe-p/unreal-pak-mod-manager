@@ -48,8 +48,15 @@ fn process_all_raw_dirs(raw_dir: &std::path::Path, repo: &Repository) {
 
     let mut branches: Vec<String> = Vec::new();
 
-    for entry in std::fs::read_dir(raw_dir).unwrap() {
-        let entry = entry.unwrap();
+    let mut entries: Vec<_> = std::fs::read_dir(raw_dir)
+        .unwrap()
+        .filter_map(Result::ok)
+        .collect();
+
+    // Sort entries by name, this will ensure decrease_health comes before decrease_health_again
+    entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+
+    for entry in entries {
         let path = entry.path();
         let branch_name: String = path.file_name().unwrap().to_str().unwrap().to_string();
 
