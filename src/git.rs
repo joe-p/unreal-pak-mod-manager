@@ -1,6 +1,8 @@
 use git2::{Error, FileFavor, MergeOptions, Repository};
 use std::{io::Read, path::Path};
 
+use crate::merge;
+
 pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), Error> {
     // Try to find the branch first
     let branch = match repo.find_branch(branch_name, git2::BranchType::Local) {
@@ -72,7 +74,12 @@ pub fn merge_branch(repo: &Repository, from_branch: &str) -> Result<(), Error> {
         let their_id = conflict.their.as_ref().map(|e| e.id);
 
         if let (Some(path), Some(our_id), Some(their_id)) = (path, our_id, their_id) {
-            handle_merge_conflict(repo, &path, our_id, their_id)?;
+            let ancestor_id = conflict
+                .ancestor
+                .as_ref()
+                .map(|e| e.id)
+                .expect("No ancestor");
+            handle_merge_conflict(repo, &path, ancestor_id, our_id, their_id)?;
         }
     }
 
@@ -100,13 +107,21 @@ pub fn merge_branch(repo: &Repository, from_branch: &str) -> Result<(), Error> {
 fn handle_merge_conflict(
     repo: &Repository,
     path: &str,
+    base_id: git2::Oid,
     our_id: git2::Oid,
     their_id: git2::Oid,
 ) -> Result<(), Error> {
     println!("Conflict in file: {}", path);
 
+    let base_blob = repo.find_blob(base_id)?;
     let our_blob = repo.find_blob(our_id)?;
     let their_blob = repo.find_blob(their_id)?;
+
+    let mut base_buf = String::new();
+    base_blob
+        .content()
+        .read_to_string(&mut base_buf)
+        .expect("Failed to read base blob");
 
     let mut our_buf = String::new();
     our_blob
@@ -120,8 +135,29 @@ fn handle_merge_conflict(
         .read_to_string(&mut their_buf)
         .expect("Failed to read their blob");
 
+    println!("Base blob: {:?}", base_buf);
     println!("Our blob: {:?}", our_buf);
     println!("Their blob: {:?}", their_buf);
+
+    if path.ends_with(".json") {
+        let merged = merge::merge_json_strings(&base_buf, &our_buf, &their_buf)
+            .expect("Failed to merge JSON");
+        println!("Merged blob: {:?}", merged);
+
+        // Get the absolute path by joining with repository's workdir
+        let workdir = repo.workdir().expect("Repository has no working directory");
+        let full_path = workdir.join(path);
+
+        // Write the merged content to the file
+        std::fs::write(&full_path, merged + "\n").expect("Failed to write merged content");
+
+        // Stage the merged file
+        let mut index = repo.index()?;
+        index.add_path(Path::new(path))?; // Use relative path for git index
+        index.write()?;
+
+        return Ok(());
+    }
 
     Err(Error::from_str(&format!(
         "Failed to resolve conflict for file: {}",

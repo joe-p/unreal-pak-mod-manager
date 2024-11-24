@@ -3,6 +3,7 @@ extern crate git2;
 use git2::Repository;
 
 pub mod git;
+pub mod merge;
 
 fn process_all_raw_dirs(raw_dir: &std::path::Path, repo: &Repository) {
     fn process_dir(dir: &std::path::Path, root_dir: &std::path::Path, repo: &Repository) {
@@ -21,12 +22,25 @@ fn process_all_raw_dirs(raw_dir: &std::path::Path, repo: &Repository) {
                     path.display(),
                     repo.path().parent().unwrap().display()
                 );
-                // Copy the file to the modpack directory
-                std::fs::copy(
-                    path.as_path(),
-                    repo.path().parent().unwrap().join(relative_path),
-                )
-                .unwrap();
+
+                // If the file is a JSON file, normalize it
+                if path.extension().map_or(false, |ext| ext == "json") {
+                    println!("Normalizing JSON file: {}", path.display());
+                    let content = std::fs::read_to_string(&path).unwrap();
+                    let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+                    std::fs::write(
+                        repo.path().parent().unwrap().join(relative_path),
+                        serde_json::to_string_pretty(&json).unwrap(),
+                    )
+                    .unwrap();
+                } else {
+                    // Copy the file to the modpack directory
+                    std::fs::copy(
+                        path.as_path(),
+                        repo.path().parent().unwrap().join(relative_path),
+                    )
+                    .unwrap();
+                }
             }
         }
     }
