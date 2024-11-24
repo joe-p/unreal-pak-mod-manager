@@ -1,7 +1,6 @@
 use indexmap::IndexMap;
 use regex::Regex;
 use serde::ser::{Serialize, SerializeMap, Serializer};
-use std::collections::HashMap;
 
 // Define a type that can represent either a nested struct or final key-value pairs
 #[derive(Debug)]
