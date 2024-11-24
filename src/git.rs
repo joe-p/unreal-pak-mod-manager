@@ -1,7 +1,7 @@
 use git2::{Error, FileFavor, MergeOptions, Repository};
 use std::{io::Read, path::Path};
 
-use crate::merge;
+use crate::{cfg_parser, merge};
 
 pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), Error> {
     // Try to find the branch first
@@ -135,28 +135,49 @@ fn handle_merge_conflict(
         .read_to_string(&mut their_buf)
         .expect("Failed to read their blob");
 
-    println!("Base blob: {:?}", base_buf);
-    println!("Our blob: {:?}", our_buf);
-    println!("Their blob: {:?}", their_buf);
-
-    if path.ends_with(".json") {
-        let merged = merge::merge_json_strings(&base_buf, &our_buf, &their_buf)
-            .expect("Failed to merge JSON");
-        println!("Merged blob: {:?}", merged);
-
-        // Get the absolute path by joining with repository's workdir
+    // Helper function to write and stage merged content
+    fn write_and_stage(repo: &Repository, path: &str, content: String) -> Result<(), Error> {
         let workdir = repo.workdir().expect("Repository has no working directory");
         let full_path = workdir.join(path);
 
         // Write the merged content to the file
-        std::fs::write(&full_path, merged + "\n").expect("Failed to write merged content");
+        std::fs::write(&full_path, content + "\n").expect("Failed to write merged content");
 
         // Stage the merged file
         let mut index = repo.index()?;
-        index.add_path(Path::new(path))?; // Use relative path for git index
+        index.add_path(Path::new(path))?;
         index.write()?;
 
-        return Ok(());
+        Ok(())
+    }
+
+    if path.ends_with(".json") {
+        let merged = merge::merge_json_strings(&base_buf, &our_buf, &their_buf)
+            .expect("Failed to merge JSON");
+        return write_and_stage(repo, path, merged);
+    }
+
+    if path.ends_with(".cfg") {
+        let base_json = cfg_parser::parse_config(&base_buf);
+        let our_json = cfg_parser::parse_config(&our_buf);
+        let their_json = cfg_parser::parse_config(&their_buf);
+
+        let base_json_str =
+            serde_json::to_string(&base_json).expect("Failed to convert base JSON to string");
+        let our_json_str =
+            serde_json::to_string(&our_json).expect("Failed to convert our JSON to string");
+        let their_json_str =
+            serde_json::to_string(&their_json).expect("Failed to convert their JSON to string");
+
+        let merged_json_str =
+            merge::merge_json_strings(&base_json_str, &our_json_str, &their_json_str)
+                .expect("Failed to merge JSON");
+
+        let merged_json =
+            serde_json::from_str(&merged_json_str).expect("Failed to parse merged JSON");
+        let merged_cfg = cfg_parser::json_to_cfg(&merged_json);
+
+        return write_and_stage(repo, path, merged_cfg);
     }
 
     Err(Error::from_str(&format!(
