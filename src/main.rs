@@ -1,7 +1,8 @@
 extern crate git2;
 
 use git2::Repository;
-use git2::Signature;
+
+pub mod git;
 
 fn process_all_raw_dirs(raw_dir: &std::path::Path, repo: &Repository) {
     fn process_dir(dir: &std::path::Path, root_dir: &std::path::Path, repo: &Repository) {
@@ -30,64 +31,35 @@ fn process_all_raw_dirs(raw_dir: &std::path::Path, repo: &Repository) {
         }
     }
 
+    let mut branches: Vec<String> = Vec::new();
+
     for entry in std::fs::read_dir(raw_dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
+        let branch_name: String = path.file_name().unwrap().to_str().unwrap().to_string();
 
+        println!("Processing branch: {}", branch_name);
+
+        // First add untracked files to master
+        git::checkout_branch(repo, "master").expect("Failed to checkout master");
         if path.is_dir() {
             process_dir(&path, &path, repo);
         }
+        git::commit_files(repo, &branch_name, true).expect("Failed to commit untracked_files");
 
-        commit_to_branch(repo, path.file_name().unwrap().to_str().unwrap());
+        // Now checkout branch for this root dir and add tracked files
+        println!("Checking out branch: {}", branch_name);
+        git::checkout_branch(repo, &branch_name).expect("Failed to checkout branch");
+        git::commit_files(repo, &branch_name, false).expect("Failed to commit tracked files");
+
+        branches.push(branch_name);
     }
-}
 
-fn commit_to_branch(repo: &Repository, branch: &str) {
-    // Get the index
-    let mut index = repo.index().expect("Failed to get index");
-
-    // Add all files in the repository directory to the index
-    index
-        .add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, None)
-        .expect("Failed to add files to index");
-    index.write().expect("Failed to write index");
-
-    // Write the tree object
-    let tree_id = index.write_tree().expect("Failed to write tree");
-    let tree = repo.find_tree(tree_id).expect("Failed to find tree");
-
-    // Create a signature for the commit
-    let signature = Signature::now("Strelok", "The Zone").expect("Failed to create signature");
-
-    // Get the parent commit if HEAD exists
-    let parent_commits = match repo.head() {
-        Ok(head) => vec![head.peel_to_commit().expect("Failed to get head commit")],
-        Err(_) => vec![], // Empty vec for initial commit
-    };
-
-    let parent_commits: Vec<&git2::Commit> = parent_commits.iter().collect();
-
-    // Create the commit
-    let commit_id = repo
-        .commit(
-            None, // Don't update HEAD yet
-            &signature,
-            &signature,
-            branch,
-            &tree,
-            &parent_commits,
-        )
-        .expect("Failed to commit");
-
-    let branch_name = branch.replace(" ", "-");
-
-    // Create a new branch pointing to this commit
-    repo.branch(
-        &branch_name,
-        &repo.find_commit(commit_id).expect("Failed to find commit"),
-        false,
-    )
-    .expect("Failed to create branch");
+    // Merge all branches into master
+    for branch in branches {
+        git::checkout_branch(repo, "master").expect("Failed to checkout master");
+        git::merge_branch(repo, &branch).expect("Failed to merge branch");
+    }
 }
 
 fn main() {
@@ -120,38 +92,11 @@ fn main() {
 
     std::fs::create_dir_all(full_modpack_dir.clone()).expect("Failed to create modpack directory");
 
-    let repo: Repository = Repository::init(full_modpack_dir.clone())
+    let repo: Repository = git::init_repository(full_modpack_dir.to_str().unwrap())
         .expect("Failed to initialize modpack repository");
 
-    // Create an empty initial commit
-    let empty_tree_id = repo
-        .treebuilder(None)
-        .expect("Failed to create tree builder")
-        .write()
-        .expect("Failed to write empty tree");
-    let tree = repo
-        .find_tree(empty_tree_id)
-        .expect("Failed to find empty tree");
+    let raw_dir = config["raw_dir"].as_str().unwrap();
+    let full_raw_dir = config_dir.join(raw_dir);
 
-    let signature = Signature::now("Strelok", "The Zone").expect("Failed to create signature");
-
-    repo.commit(
-        Some("HEAD"), // Update HEAD directly since this is the initial commit
-        &signature,
-        &signature,
-        "Initial empty commit",
-        &tree,
-        &[], // No parent commits for initial commit
-    )
-    .expect("Failed to create initial commit");
-
-    println!("Repository: {}", repo.path().display());
-
-    let raw_dir = config_dir.join(config["raw_dir"].as_str().unwrap());
-
-    process_all_raw_dirs(&raw_dir, &repo);
-
-    // // Remove the .git directory. This is only needed for the example so it tracks properly
-    // std::fs::remove_dir_all(full_modpack_dir.join(".git"))
-    //     .expect("Failed to remove .git directory");
+    process_all_raw_dirs(&full_raw_dir, &repo);
 }
