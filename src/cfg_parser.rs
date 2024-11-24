@@ -77,3 +77,47 @@ pub fn parse_config(input: &str) -> serde_json::Value {
 
     serde_json::to_value(&config).expect("Failed to convert to JSON value")
 }
+
+pub fn json_to_cfg(value: &serde_json::Value) -> String {
+    fn write_value(
+        builder: &mut String,
+        value: &serde_json::Value,
+        name: &str,
+        indent_level: usize,
+    ) {
+        let indent = "   ".repeat(indent_level);
+
+        match value {
+            serde_json::Value::Object(map) => {
+                // Write struct begin
+                builder.push_str(&format!("{}{} : struct.begin\n", indent, name));
+
+                // Write all key-value pairs inside the struct
+                for (key, val) in map {
+                    write_value(builder, val, key, indent_level + 1);
+                }
+
+                // Write struct end
+                builder.push_str(&format!("{}struct.end\n", indent));
+            }
+            _ => {
+                // Write simple key-value pair
+                builder.push_str(&format!(
+                    "{}{} = {}\n",
+                    indent,
+                    name,
+                    value.as_str().unwrap_or(&value.to_string())
+                ));
+            }
+        }
+    }
+
+    let mut output = String::new();
+    if let serde_json::Value::Object(map) = value {
+        for (key, val) in map {
+            write_value(&mut output, val, key, 0);
+        }
+    }
+
+    output
+}

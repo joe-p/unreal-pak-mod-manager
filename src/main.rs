@@ -124,4 +124,6 @@ fn main() {
         "{}",
         serde_json::to_string_pretty(&json_value).expect("Failed to convert JSON to string")
     );
+
+    println!("{}", cfg_parser::json_to_cfg(&json_value));
 }
