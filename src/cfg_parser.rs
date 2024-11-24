@@ -34,20 +34,24 @@ pub fn parse_config(input: &str) -> serde_json::Value {
     let mut config: ConfigValue = ConfigValue::Struct(IndexMap::new());
     let assignment_re = Regex::new(r"^\w+\s*=").unwrap();
 
+    // Keep track of [*] count separately
+    let mut star_count = 0;
+
     for line in lines.iter() {
         if line.trim().matches("struct.begin").count() > 0 {
             let parts: Vec<&str> = line.split(":").collect();
             let struct_name = parts[0].trim();
-            let meta = if parts.len() > 1 {
-                parts[1]
-                    .trim()
-                    .replace("struct.begin", "")
-                    .trim()
-                    .to_string()
+
+            // Handle [*] special case
+            let current_struct_name = if struct_name == "[*]" {
+                let name = format!("[*]//{}", star_count);
+                star_count += 1;
+                name
             } else {
-                String::new()
+                struct_name.to_string()
             };
-            structs.push(struct_name.to_string());
+
+            structs.push(current_struct_name);
 
             // Create nested structure
             let mut current = &mut config;
@@ -61,7 +65,12 @@ pub fn parse_config(input: &str) -> serde_json::Value {
             }
 
             // Add metadata if present
-            if !meta.is_empty() {
+            if parts.len() > 1 {
+                let meta = parts[1]
+                    .trim()
+                    .replace("struct.begin", "")
+                    .trim()
+                    .to_string();
                 match current {
                     ConfigValue::Struct(map) => {
                         map.insert("//meta".to_string(), ConfigValue::Value(meta));
@@ -109,14 +118,21 @@ pub fn json_to_cfg(value: &serde_json::Value) -> String {
 
         match value {
             serde_json::Value::Object(map) => {
+                // Convert [*]//n back to [*]
+                let display_name = if name.starts_with("[*]//") {
+                    "[*]"
+                } else {
+                    name
+                };
+
                 // Get and remove meta information if present
                 let meta = map.get("//meta").and_then(|v| v.as_str()).unwrap_or("");
 
-                // Write struct begin with meta
+                // Write struct begin with meta using display_name
                 let struct_begin = if meta.is_empty() {
-                    format!("{}{} : struct.begin\n", indent, name)
+                    format!("{}{} : struct.begin\n", indent, display_name)
                 } else {
-                    format!("{}{} : struct.begin {}\n", indent, name, meta)
+                    format!("{}{} : struct.begin {}\n", indent, display_name, meta)
                 };
                 builder.push_str(&struct_begin);
 
