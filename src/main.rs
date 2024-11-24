@@ -2,6 +2,7 @@ extern crate git2;
 
 use git2::Repository;
 
+pub mod cfg_parser;
 pub mod git;
 pub mod merge;
 
@@ -113,4 +114,10 @@ fn main() {
     let full_raw_dir = config_dir.join(raw_dir);
 
     process_all_raw_dirs(&full_raw_dir, &repo);
+
+    let config_str = std::fs::read_to_string(
+        "/Users/joe/git/joe-p/unreal-pak-mod-manager/example/raw/add_mutant/bloodsucker.cfg",
+    )
+    .expect("Failed to read config file");
+    cfg_parser::parse_config(&config_str)
 }
