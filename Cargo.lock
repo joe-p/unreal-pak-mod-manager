@@ -565,6 +565,7 @@ name = "unreal-pak-mod-manager"
 version = "0.1.0"
 dependencies = [
  "git2",
+ "indexmap",
  "json-patch",
  "regex",
  "serde",

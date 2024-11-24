@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use regex::Regex;
 use serde::ser::{Serialize, SerializeMap, Serializer};
 use std::collections::HashMap;
@@ -5,7 +6,7 @@ use std::collections::HashMap;
 // Define a type that can represent either a nested struct or final key-value pairs
 #[derive(Debug)]
 pub enum ConfigValue {
-    Struct(HashMap<String, ConfigValue>),
+    Struct(IndexMap<String, ConfigValue>),
     Value(String),
 }
 
@@ -31,7 +32,7 @@ impl Serialize for ConfigValue {
 pub fn parse_config(input: &str) -> serde_json::Value {
     let lines = input.lines().collect::<Vec<&str>>();
     let mut structs: Vec<String> = Vec::new();
-    let mut config: ConfigValue = ConfigValue::Struct(HashMap::new());
+    let mut config: ConfigValue = ConfigValue::Struct(IndexMap::new());
     let assignment_re = Regex::new(r"^\w+\s*=").unwrap();
 
     for line in lines.iter() {
@@ -55,7 +56,7 @@ pub fn parse_config(input: &str) -> serde_json::Value {
                 current = match current {
                     ConfigValue::Struct(map) => map
                         .entry(struct_name.clone())
-                        .or_insert_with(|| ConfigValue::Struct(HashMap::new())),
+                        .or_insert_with(|| ConfigValue::Struct(IndexMap::new())),
                     _ => panic!("Expected a struct"),
                 };
             }
@@ -81,7 +82,7 @@ pub fn parse_config(input: &str) -> serde_json::Value {
                 current = match current {
                     ConfigValue::Struct(map) => map
                         .entry(struct_name.clone())
-                        .or_insert_with(|| ConfigValue::Struct(HashMap::new())),
+                        .or_insert_with(|| ConfigValue::Struct(IndexMap::new())),
                     _ => panic!("Expected a struct"),
                 };
             }
