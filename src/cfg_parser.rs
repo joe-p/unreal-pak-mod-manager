@@ -36,7 +36,17 @@ pub fn parse_config(input: &str) -> serde_json::Value {
 
     for line in lines.iter() {
         if line.trim().matches("struct.begin").count() > 0 {
-            let struct_name = line.split(":").nth(0).unwrap().trim();
+            let parts: Vec<&str> = line.split(":").collect();
+            let struct_name = parts[0].trim();
+            let meta = if parts.len() > 1 {
+                parts[1]
+                    .trim()
+                    .replace("struct.begin", "")
+                    .trim()
+                    .to_string()
+            } else {
+                String::new()
+            };
             structs.push(struct_name.to_string());
 
             // Create nested structure
@@ -48,6 +58,16 @@ pub fn parse_config(input: &str) -> serde_json::Value {
                         .or_insert_with(|| ConfigValue::Struct(HashMap::new())),
                     _ => panic!("Expected a struct"),
                 };
+            }
+
+            // Add metadata if present
+            if !meta.is_empty() {
+                match current {
+                    ConfigValue::Struct(map) => {
+                        map.insert("//meta".to_string(), ConfigValue::Value(meta));
+                    }
+                    _ => panic!("Expected a struct"),
+                }
             }
         } else if line.trim().matches("struct.end").count() > 0 {
             structs.pop().expect("Failed to pop. This appears to be an error in parsing the beginning or ending of a struct.");
@@ -89,12 +109,22 @@ pub fn json_to_cfg(value: &serde_json::Value) -> String {
 
         match value {
             serde_json::Value::Object(map) => {
-                // Write struct begin
-                builder.push_str(&format!("{}{} : struct.begin\n", indent, name));
+                // Get and remove meta information if present
+                let meta = map.get("//meta").and_then(|v| v.as_str()).unwrap_or("");
 
-                // Write all key-value pairs inside the struct
+                // Write struct begin with meta
+                let struct_begin = if meta.is_empty() {
+                    format!("{}{} : struct.begin\n", indent, name)
+                } else {
+                    format!("{}{} : struct.begin {}\n", indent, name, meta)
+                };
+                builder.push_str(&struct_begin);
+
+                // Write all key-value pairs inside the struct (except meta)
                 for (key, val) in map {
-                    write_value(builder, val, key, indent_level + 1);
+                    if key != "//meta" {
+                        write_value(builder, val, key, indent_level + 1);
+                    }
                 }
 
                 // Write struct end
