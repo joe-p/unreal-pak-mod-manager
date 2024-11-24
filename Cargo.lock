@@ -566,6 +566,7 @@ dependencies = [
  "git2",
  "json-patch",
  "regex",
+ "serde",
  "serde_json",
  "toml",
 ]

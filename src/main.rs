@@ -119,5 +119,9 @@ fn main() {
         "/Users/joe/git/joe-p/unreal-pak-mod-manager/example/raw/add_mutant/bloodsucker.cfg",
     )
     .expect("Failed to read config file");
-    cfg_parser::parse_config(&config_str)
+    let json_value = cfg_parser::parse_config(&config_str);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json_value).expect("Failed to convert JSON to string")
+    );
 }
