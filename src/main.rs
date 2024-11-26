@@ -12,7 +12,7 @@ pub mod cfg_parser;
 pub mod git;
 pub mod merge;
 
-fn process_all_raw_dirs(raw_dir: &std::path::Path, repo: &Repository) {
+fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
     fn process_dir(dir: &std::path::Path, root_dir: &std::path::Path, repo: &Repository) {
         for entry in std::fs::read_dir(dir).unwrap() {
             let entry = entry.unwrap();
@@ -54,7 +54,7 @@ fn process_all_raw_dirs(raw_dir: &std::path::Path, repo: &Repository) {
 
     let mut branches: Vec<String> = Vec::new();
 
-    let mut entries: Vec<_> = std::fs::read_dir(raw_dir)
+    let mut entries: Vec<_> = std::fs::read_dir(input_dir)
         .unwrap()
         .filter_map(Result::ok)
         .collect();
@@ -108,25 +108,25 @@ fn main() {
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."));
 
-    // Join the config directory with modpack_dir to get the full path
-    let modpack_dir = config["modpack_dir"].as_str().unwrap();
-    let full_modpack_dir = config_dir.join(modpack_dir);
+    // Join the config directory with staging_dir to get the full path
+    let staging_dir = config["staging_dir"].as_str().unwrap();
+    let full_staging_dir = config_dir.join(staging_dir);
 
     // Delete the modpack directory if it exists
-    if full_modpack_dir.exists() {
-        std::fs::remove_dir_all(full_modpack_dir.clone())
+    if full_staging_dir.exists() {
+        std::fs::remove_dir_all(full_staging_dir.clone())
             .expect("Failed to delete modpack directory");
     }
 
-    std::fs::create_dir_all(full_modpack_dir.clone()).expect("Failed to create modpack directory");
+    std::fs::create_dir_all(full_staging_dir.clone()).expect("Failed to create modpack directory");
 
-    let repo: Repository = git::init_repository(full_modpack_dir.to_str().unwrap())
+    let repo: Repository = git::init_repository(full_staging_dir.to_str().unwrap())
         .expect("Failed to initialize modpack repository");
 
-    let raw_dir = config["raw_dir"].as_str().unwrap();
-    let full_raw_dir = config_dir.join(raw_dir);
+    let input_dir = config["input_dir"].as_str().unwrap();
+    let full_input_dir = config_dir.join(input_dir);
 
-    process_all_raw_dirs(&full_raw_dir, &repo);
+    process_all_input_dirs(&full_input_dir, &repo);
 
     let name = config["name"].as_str().unwrap();
     let pak_path = config_dir.join(format!("{}.pak", name));
@@ -151,7 +151,7 @@ fn main() {
     }
 
     let mut pak_files = Vec::new();
-    collect_pak_files(&full_modpack_dir, &mut pak_files);
+    collect_pak_files(&full_staging_dir, &mut pak_files);
 
     for path in pak_files {
         let path_slash = path.to_slash().unwrap();
