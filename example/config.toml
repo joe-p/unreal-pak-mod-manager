@@ -1,6 +1,8 @@
 # The name of .pak file that is created
 name = "example_modpack"
 
+# All directories in this config are relative to the location of this config file
+
 # The directory where all of the files are staged before being added to the .pak file
 # This directory will be a git repository so you can use git to look at the history of the files
 # Each input mod will contain it's own branch and merge commit
