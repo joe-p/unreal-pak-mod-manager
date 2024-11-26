@@ -40,7 +40,6 @@ pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), Error
     Ok(())
 }
 
-// TODO: Custom merge driver for cfg files
 pub fn merge_branch(repo: &Repository, from_branch: &str) -> Result<(), Error> {
     // Get the source branch's commit
     let from = repo.find_branch(from_branch, git2::BranchType::Local)?;
