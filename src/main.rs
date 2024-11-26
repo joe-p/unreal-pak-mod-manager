@@ -6,7 +6,7 @@ use std::{
 };
 
 use git2::Repository;
-use path_slash::PathBufExt as _;
+use path_slash::PathExt as _;
 
 pub mod git;
 pub mod gsc_cfg;
@@ -172,9 +172,13 @@ fn main() {
             let entry = entry.unwrap();
             let path = entry.path();
 
+            if path.file_name().unwrap() == ".git" {
+                continue;
+            }
+
             if path.is_dir() {
                 collect_pak_files(&path, files);
-            } else if path.extension().map_or(false, |ext| ext == "pak") {
+            } else {
                 files.push(path);
             }
         }
@@ -184,7 +188,9 @@ fn main() {
     collect_pak_files(&full_staging_dir, &mut pak_files);
 
     for path in pak_files {
-        let path_slash = path.to_slash().unwrap();
+        let pak_path = path.strip_prefix(&full_staging_dir).unwrap();
+        let path_slash = pak_path.to_slash().unwrap();
+        println!("Adding {} to pak", path_slash);
         pak.write_file(&path_slash, fs::read(&path).unwrap())
             .unwrap();
     }
