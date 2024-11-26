@@ -1,6 +1,12 @@
 extern crate git2;
 
+use std::{
+    fs::{self, File},
+    io::BufWriter,
+};
+
 use git2::Repository;
+use path_slash::{PathBufExt, PathExt};
 
 pub mod cfg_parser;
 pub mod git;
@@ -121,4 +127,37 @@ fn main() {
     let full_raw_dir = config_dir.join(raw_dir);
 
     process_all_raw_dirs(&full_raw_dir, &repo);
+
+    let name = config["name"].as_str().unwrap();
+    let pak_path = config_dir.join(format!("{}.pak", name));
+    let mut pak = repak::PakBuilder::new().writer(
+        BufWriter::new(File::create(pak_path).expect("Failed to create pak file")),
+        repak::Version::V8B,
+        "../../../".to_string(),
+        None,
+    );
+
+    fn collect_pak_files(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
+        for entry in fs::read_dir(dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+
+            if path.is_dir() {
+                collect_pak_files(&path, files);
+            } else if path.extension().map_or(false, |ext| ext == "pak") {
+                files.push(path);
+            }
+        }
+    }
+
+    let mut pak_files = Vec::new();
+    collect_pak_files(&full_modpack_dir, &mut pak_files);
+
+    for path in pak_files {
+        let path_slash = path.to_slash().unwrap();
+        pak.write_file(&path_slash, fs::read(&path).unwrap())
+            .unwrap();
+    }
+
+    pak.write_index().unwrap();
 }
