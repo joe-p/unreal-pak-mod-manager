@@ -12,6 +12,30 @@ pub mod git;
 pub mod gsc_cfg;
 pub mod merge;
 
+fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) {
+    let pak = repak::PakBuilder::new()
+        .reader(&mut std::io::BufReader::new(File::open(path).unwrap()))
+        .unwrap();
+
+    // Extract each file
+    for entry_path in pak.files() {
+        let out_path = output_dir.join(&entry_path);
+
+        // Create parent directories
+        if let Some(parent) = out_path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+
+        // Extract the file
+        pak.read_file(
+            &entry_path,
+            &mut std::io::BufReader::new(File::open(path).unwrap()),
+            &mut fs::File::create(&out_path).unwrap(),
+        )
+        .unwrap();
+    }
+}
+
 fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
     fn process_dir(dir: &std::path::Path, root_dir: &std::path::Path, repo: &Repository) {
         for entry in std::fs::read_dir(dir).unwrap() {
@@ -70,9 +94,15 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
 
         // First add untracked files to master
         git::checkout_branch(repo, "master").expect("Failed to checkout master");
+
         if path.is_dir() {
             process_dir(&path, &path, repo);
+        } else if path.extension().map_or(false, |ext| ext == "pak") {
+            unpak_pak(&path, &repo.path().parent().unwrap());
+        } else {
+            panic!("Unknown file type: {}", path.display());
         }
+
         git::commit_files(repo, &branch_name, true).expect("Failed to commit untracked_files");
 
         // Now checkout branch for this root dir and add tracked files
