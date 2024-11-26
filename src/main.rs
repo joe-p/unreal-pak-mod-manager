@@ -19,7 +19,10 @@ fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) {
 
     // Extract each file
     for entry_path in pak.files() {
-        let out_path = output_dir.join(&entry_path);
+        let out_path = output_dir
+            .join(pak.mount_point().replace("../../../", ""))
+            .join(&entry_path);
+        println!("Extracting {} to {}", entry_path, out_path.display());
 
         // Create parent directories
         if let Some(parent) = out_path.parent() {
