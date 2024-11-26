@@ -6,10 +6,10 @@ use std::{
 };
 
 use git2::Repository;
-use path_slash::{PathBufExt, PathExt};
+use path_slash::PathBufExt as _;
 
-pub mod cfg_parser;
 pub mod git;
+pub mod gsc_cfg;
 pub mod merge;
 
 fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
