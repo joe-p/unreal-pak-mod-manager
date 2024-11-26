@@ -51,6 +51,11 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
                 // Path relative to raw dir
                 let relative_path = path.strip_prefix(root_dir).unwrap();
 
+                // Create parent directories
+                if let Some(parent) = repo.path().parent().unwrap().join(relative_path).parent() {
+                    fs::create_dir_all(parent).unwrap();
+                }
+
                 println!(
                     "Copying {} to {}",
                     path.display(),
