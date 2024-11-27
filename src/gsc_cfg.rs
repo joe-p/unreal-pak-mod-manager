@@ -1,5 +1,9 @@
 use crate::merge;
-use regex::Regex;
+use nom::{
+    bytes::complete::{tag, take_till},
+    character::complete::{multispace0, not_line_ending},
+    IResult,
+};
 use serde::Deserialize;
 use serde::Serialize;
 use slotmap::DefaultKey;
@@ -81,22 +85,40 @@ impl GscCfg {
     pub fn from_str(name: String, cfg_str: &str) -> GscCfg {
         let mut root_structs: Vec<DefaultKey> = Vec::new();
         let mut structs: SlotMap<DefaultKey, GscCfgStruct> = SlotMap::new();
-
-        let struct_begin_regex: Regex = Regex::new(r"^(\S+)\s*:\s*struct.begin(.*)").unwrap();
-        let struct_end_regex: Regex = Regex::new(r"^struct.end").unwrap();
-        let value_regex: Regex = Regex::new(r"^(\S+)\s*=\s*(.*)").unwrap();
-
         let mut current_struct_key: Option<DefaultKey> = None;
 
+        // Parser combinators
+        fn struct_begin(input: &str) -> IResult<&str, (String, String)> {
+            let (input, _) = multispace0(input)?;
+            let (input, name) = take_till(|c: char| c.is_whitespace())(input)?;
+            let (input, _) = multispace0(input)?;
+            let (input, _) = tag(":")(input)?;
+            let (input, _) = multispace0(input)?;
+            let (input, _) = tag("struct.begin")(input)?;
+            let (input, meta) = not_line_ending(input)?;
+            Ok((input, (name.to_string(), meta.to_string())))
+        }
+
+        fn struct_end(input: &str) -> IResult<&str, ()> {
+            let (input, _) = multispace0(input)?;
+            let (input, _) = tag("struct.end")(input)?;
+            Ok((input, ()))
+        }
+
+        fn value_line(input: &str) -> IResult<&str, (String, String)> {
+            let (input, _) = multispace0(input)?;
+            let (input, name) = take_till(|c: char| c.is_whitespace())(input)?;
+            let (input, _) = multispace0(input)?;
+            let (input, _) = tag("=")(input)?;
+            let (input, _) = multispace0(input)?;
+            let (input, value) = not_line_ending(input)?;
+            Ok((input, (name.to_string(), value.to_string())))
+        }
+
         for line in cfg_str.lines() {
-            let line = line.trim();
-
-            if let Some(captures) = struct_begin_regex.captures(line) {
-                let name = captures.get(1).unwrap().as_str().to_string();
-                let meta = captures.get(2).unwrap().as_str().to_string();
-
+            if let Ok((_, (name, meta))) = struct_begin(line) {
                 let struct_key = structs.insert(GscCfgStruct {
-                    name: name.clone(), // cloning because we might need it below for the CfgValue
+                    name: name.clone(),
                     meta,
                     values: Vec::new(),
                     parent: current_struct_key,
@@ -120,7 +142,7 @@ impl GscCfg {
                 continue;
             }
 
-            if struct_end_regex.is_match(line) {
+            if struct_end(line).is_ok() {
                 let current_struct = structs
                     .get_mut(current_struct_key.expect(
                         "By the time we get to struct.end, we should always have a current struct key",
@@ -131,10 +153,7 @@ impl GscCfg {
                 continue;
             }
 
-            if let Some(captures) = value_regex.captures(line) {
-                let name = captures.get(1).unwrap().as_str().to_string();
-                let value = captures.get(2).unwrap().as_str().to_string();
-
+            if let Ok((_, (name, value))) = value_line(line) {
                 let current_struct = structs
                     .get_mut(current_struct_key.expect(
                         "By the time we get to a value, we should always have a current struct key",
