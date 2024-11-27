@@ -8,7 +8,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use slotmap::DefaultKey;
 use slotmap::SlotMap;
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Display, Formatter};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GscCfgStruct {
@@ -33,9 +33,9 @@ pub struct GscCfg {
 }
 
 impl Display for GscCfg {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        for struct_key in self.root_structs.clone() {
-            write!(f, "{}", self.struct_to_string(struct_key, 0))?;
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for struct_key in &self.root_structs {
+            write!(f, "{}", self.struct_to_string(*struct_key, 0))?;
         }
 
         Ok(())
