@@ -124,7 +124,8 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
     // Merge all branches into master
     for branch in branches {
         git::checkout_branch(repo, "master").expect("Failed to checkout master");
-        git::merge_branch(repo, &branch).expect("Failed to merge branch");
+        git::merge_branch(repo, &branch, git::MergeStrategy::Custom)
+            .expect("Failed to merge branch");
     }
 }
 

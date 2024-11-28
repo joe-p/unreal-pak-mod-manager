@@ -40,7 +40,22 @@ pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), Error
     Ok(())
 }
 
-pub fn merge_branch(repo: &Repository, from_branch: &str) -> Result<(), Error> {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MergeStrategy {
+    Custom,    // Use custom merge logic
+    Theirs,    // Use theirs
+    Overwrite, // Overwrite our version with theirs
+}
+
+pub fn merge_branch(
+    repo: &Repository,
+    from_branch: &str,
+    strategy: MergeStrategy,
+) -> Result<(), Error> {
+    println!(
+        "Merging branch: {} with strategy: {:?}",
+        from_branch, strategy
+    );
     // Get the source branch's commit
     let from = repo.find_branch(from_branch, git2::BranchType::Local)?;
     let from_commit = repo.find_commit(from.get().target().unwrap())?;
@@ -54,13 +69,18 @@ pub fn merge_branch(repo: &Repository, from_branch: &str) -> Result<(), Error> {
 
     // Set up merge options with custom conflict handling
     let mut merge_opts = MergeOptions::new();
-    merge_opts.file_favor(FileFavor::Normal);
+    if strategy == MergeStrategy::Theirs {
+        merge_opts.file_favor(FileFavor::Theirs);
+    } else {
+        merge_opts.file_favor(FileFavor::Normal);
+    }
 
     // Perform the merge with options
     repo.merge(&[&annotated_commit], Some(&mut merge_opts), None)
         .expect("Failed to perform merge");
 
     // Get conflicted files
+    let mut unhandled_conflicts = false;
     let index = repo.index()?;
     for entry in index.conflicts()? {
         let conflict = entry?;
@@ -79,7 +99,29 @@ pub fn merge_branch(repo: &Repository, from_branch: &str) -> Result<(), Error> {
                 .as_ref()
                 .map(|e| e.id)
                 .expect("No ancestor");
-            handle_merge_conflict(repo, &path, ancestor_id, our_id, their_id)?;
+
+            // Handle potential error from merge conflict resolution
+            if let Err(e) = handle_merge_conflict(repo, &path, ancestor_id, our_id, their_id) {
+                println!("{}: Will try again...", e);
+
+                // This keeps their file
+                // repo.index().unwrap().remove_path(Path::new(&path))?;
+                // repo.index().unwrap().write()?;
+
+                // Overwrite the current file content with ours
+                let our_blob = repo.find_blob(our_id)?;
+                let workdir = repo.workdir().expect("Repository has no working directory");
+                let full_path = workdir.join(&path);
+                std::fs::write(&full_path, our_blob.content())
+                    .expect("Failed to write restored file");
+
+                repo.index().unwrap().add_path(Path::new(&path))?;
+                repo.index().unwrap().write()?;
+
+                unhandled_conflicts = true;
+
+                continue;
+            }
         }
     }
 
@@ -89,17 +131,19 @@ pub fn merge_branch(repo: &Repository, from_branch: &str) -> Result<(), Error> {
     let tree = repo.index()?.write_tree()?;
     let tree = repo.find_tree(tree)?;
 
-    repo.commit(
-        Some("HEAD"),
-        &sig,
-        &sig,
-        &message,
-        &tree,
-        &[&head_commit, &from_commit],
-    )?;
+    // Don't include the from_commit in parents so we can merge again with a different strategy
+    repo.commit(Some("HEAD"), &sig, &sig, &message, &tree, &[&head_commit])?;
 
     // Clean up the merge state
     repo.cleanup_state()?;
+
+    if unhandled_conflicts {
+        if strategy == MergeStrategy::Theirs {
+            merge_branch(repo, from_branch, MergeStrategy::Overwrite)?;
+        } else {
+            merge_branch(repo, from_branch, MergeStrategy::Theirs)?;
+        }
+    }
 
     Ok(())
 }
