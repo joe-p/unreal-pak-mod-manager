@@ -11,7 +11,7 @@ Due to the way unreal games load mods, it's impossible to only take some parts o
 - Automatically resolves conflicts between STALKER 2 `.cfg` files on a per-value basis
 - Automatically resolves conflicts between `.json` files on a per-value basis
 - Automatically resolves conflicts between Unreal Engine `.ini` files on a per-value basis
-- Attempts to automatically reoslve conflicts for all other file types
+- Attempts to automatically resolve conflicts for all other file types
 
 ### Example
 
