@@ -11,28 +11,28 @@ use slotmap::SlotMap;
 use std::fmt::{Display, Formatter};
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct GscCfgStruct {
+pub struct Stalker2CfgStruct {
     pub name: String,
     pub meta: String,
-    pub values: Vec<GscCfgValue>,
+    pub values: Vec<Stalker2CfgValue>,
     pub parent: Option<DefaultKey>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct GscCfgValue {
+pub struct Stalker2CfgValue {
     pub name: String,
     pub value: Option<String>,
     pub struct_key: Option<DefaultKey>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct GscCfg {
+pub struct Stalker2Cfg {
     name: String,
-    structs: SlotMap<DefaultKey, GscCfgStruct>,
+    structs: SlotMap<DefaultKey, Stalker2CfgStruct>,
     root_structs: Vec<DefaultKey>,
 }
 
-impl Display for GscCfg {
+impl Display for Stalker2Cfg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for struct_key in &self.root_structs {
             write!(f, "{}", self.struct_to_string(*struct_key, 0))?;
@@ -42,7 +42,7 @@ impl Display for GscCfg {
     }
 }
 
-impl GscCfg {
+impl Stalker2Cfg {
     fn struct_to_string(&self, struct_key: DefaultKey, indent: usize) -> String {
         let struct_value = self
             .structs
@@ -82,9 +82,9 @@ impl GscCfg {
         result
     }
 
-    pub fn from_str(name: String, cfg_str: &str) -> GscCfg {
+    pub fn from_str(name: String, cfg_str: &str) -> Stalker2Cfg {
         let mut root_structs: Vec<DefaultKey> = Vec::new();
-        let mut structs: SlotMap<DefaultKey, GscCfgStruct> = SlotMap::new();
+        let mut structs: SlotMap<DefaultKey, Stalker2CfgStruct> = SlotMap::new();
         let mut current_struct_key: Option<DefaultKey> = None;
 
         // Parser combinators
@@ -117,7 +117,7 @@ impl GscCfg {
 
         for line in cfg_str.lines() {
             if let Ok((_, (name, meta))) = struct_begin(line) {
-                let struct_key = structs.insert(GscCfgStruct {
+                let struct_key = structs.insert(Stalker2CfgStruct {
                     name: name.clone(),
                     meta,
                     values: Vec::new(),
@@ -131,7 +131,7 @@ impl GscCfg {
                         .get_mut(current_struct_key.expect("We handle none case above"))
                         .expect("Structs are never deleted");
 
-                    current_struct.values.push(GscCfgValue {
+                    current_struct.values.push(Stalker2CfgValue {
                         name,
                         value: None,
                         struct_key: Some(struct_key),
@@ -160,7 +160,7 @@ impl GscCfg {
                     ))
                     .expect("Structs are never deleted");
 
-                current_struct.values.push(GscCfgValue {
+                current_struct.values.push(Stalker2CfgValue {
                     name,
                     value: Some(value),
                     struct_key: None,
@@ -176,12 +176,16 @@ impl GscCfg {
     }
 }
 
-pub fn merge_cfg_structs(base: &GscCfg, our: &GscCfg, their: &GscCfg) -> GscCfg {
+pub fn merge_cfg_structs(
+    base: &Stalker2Cfg,
+    our: &Stalker2Cfg,
+    their: &Stalker2Cfg,
+) -> Stalker2Cfg {
     let base_json = serde_json::to_value(&base).unwrap().to_string();
     let our_json = serde_json::to_value(&our).unwrap().to_string();
     let their_json = serde_json::to_value(&their).unwrap().to_string();
 
-    serde_json::from_str::<GscCfg>(
+    serde_json::from_str::<Stalker2Cfg>(
         &merge::merge_json_strings(&base_json, &our_json, &their_json).unwrap(),
     )
     .unwrap()

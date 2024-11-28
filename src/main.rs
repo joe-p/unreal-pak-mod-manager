@@ -9,8 +9,8 @@ use git2::Repository;
 use path_slash::PathExt as _;
 
 pub mod git;
-pub mod gsc_cfg;
 pub mod merge;
+pub mod stalker2_cfg;
 
 fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) {
     let pak = repak::PakBuilder::new()

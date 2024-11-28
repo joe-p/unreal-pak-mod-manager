@@ -1,8 +1,8 @@
 use git2::{Error, FileFavor, MergeOptions, Repository};
 use std::{io::Read, path::Path};
 
-use crate::{gsc_cfg, merge};
-use gsc_cfg::GscCfg;
+use crate::{merge, stalker2_cfg};
+use stalker2_cfg::Stalker2Cfg;
 
 pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), Error> {
     let branch_name = &normalize_git_ref(branch_name);
@@ -206,11 +206,11 @@ fn handle_merge_conflict(
     }
 
     if path.ends_with(".cfg") {
-        let base_cfg = GscCfg::from_str(path.to_string(), &base_buf);
-        let our_cfg = GscCfg::from_str(path.to_string(), &our_buf);
-        let their_cfg = GscCfg::from_str(path.to_string(), &their_buf);
+        let base_cfg = Stalker2Cfg::from_str(path.to_string(), &base_buf);
+        let our_cfg = Stalker2Cfg::from_str(path.to_string(), &our_buf);
+        let their_cfg = Stalker2Cfg::from_str(path.to_string(), &their_buf);
 
-        let merged_cfg = gsc_cfg::merge_cfg_structs(&base_cfg, &our_cfg, &their_cfg);
+        let merged_cfg = stalker2_cfg::merge_cfg_structs(&base_cfg, &our_cfg, &their_cfg);
 
         return write_and_stage(repo, path, merged_cfg.to_string());
     }
