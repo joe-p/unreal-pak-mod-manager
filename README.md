@@ -6,6 +6,12 @@ This tool is used to create a single .pak file from a collection of mods for an 
 
 Due to the way unreal games load mods, it's impossible to only take some parts of one mod and combine them with parts of another mod unless you manually unpack the .pak files and repack them. This tool automates this process by automatically unpacking the .pak files, resolving any conflicts between the mods, and repacking them into a single .pak file.
 
+### Features
+
+- Automatically resolves conflicts between STALKER 2 `.cfg` files on a per-value basis
+- Automatically resolves conflicts between `.json` files on a per-value basis
+- Attempts to automatically reoslve conflicts for all other file types
+
 ### Example
 
 Let [example/mods/abc/abc.json](example/mods/abc/abc.json) be a game file that we are modding.
@@ -38,19 +44,13 @@ However, if we use this tool to create a modpack, we'd end up with both changes 
 { "a": 1, "b": 3, "c": 4 }
 ```
 
-### Features
-
-- Automatically resolves conflicts between `.cfg` files
-- Automatically resolves conflicts between `.json` files
-
 #### Planned Features
 
 These are planned features in rough order of priority
 
-- `.ini` support
+- `.ini` per-value merge support
 - Better logging
 - Allow setting custom priorities for specific mods (currently uses alphabetical order)
-- More merge strategies for resolving conflicts (ie. manual control, overwrite, etc.)
 
 ### Usage
 
