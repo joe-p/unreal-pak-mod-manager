@@ -1,8 +1,9 @@
 use git2::{Error, FileFavor, MergeOptions, Repository};
 use std::{io::Read, path::Path};
 
-use crate::{merge, stalker2_cfg};
+use crate::{merge, stalker2_cfg, unreal_ini};
 use stalker2_cfg::Stalker2Cfg;
+use unreal_ini::UnrealIni;
 
 pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), Error> {
     let branch_name = &normalize_git_ref(branch_name);
@@ -213,6 +214,16 @@ fn handle_merge_conflict(
         let merged_cfg = stalker2_cfg::merge_cfg_structs(&base_cfg, &our_cfg, &their_cfg);
 
         return write_and_stage(repo, path, merged_cfg.to_string());
+    }
+
+    if path.ends_with(".ini") {
+        let base_ini = UnrealIni::from_str(&base_buf);
+        let our_ini = UnrealIni::from_str(&our_buf);
+        let their_ini = UnrealIni::from_str(&their_buf);
+
+        let merged_ini = unreal_ini::merge_unreal_inis(&base_ini, &our_ini, &their_ini);
+
+        return write_and_stage(repo, path, merged_ini.to_string());
     }
 
     Err(Error::from_str(&format!(

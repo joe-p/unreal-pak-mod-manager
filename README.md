@@ -10,6 +10,7 @@ Due to the way unreal games load mods, it's impossible to only take some parts o
 
 - Automatically resolves conflicts between STALKER 2 `.cfg` files on a per-value basis
 - Automatically resolves conflicts between `.json` files on a per-value basis
+- Automatically resolves conflicts between Unreal Engine `.ini` files on a per-value basis
 - Attempts to automatically reoslve conflicts for all other file types
 
 ### Example
@@ -48,9 +49,9 @@ However, if we use this tool to create a modpack, we'd end up with both changes 
 
 These are planned features in rough order of priority
 
-- `.ini` per-value merge support
 - Better logging
 - Allow setting custom priorities for specific mods (currently uses alphabetical order)
+- Basic GUI
 
 ### Usage
 

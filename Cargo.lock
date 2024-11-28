@@ -325,6 +325,7 @@ checksum = "707907fe3c25f5424cce2cb7e1cbcafee6bdbe735ca90ef77c29e84591e5b9da"
 dependencies = [
  "equivalent",
  "hashbrown",
+ "serde",
 ]
 
 [[package]]
@@ -748,6 +749,7 @@ name = "unreal-pak-mod-manager"
 version = "0.1.0"
 dependencies = [
  "git2",
+ "indexmap",
  "json-patch",
  "nom",
  "path-slash",

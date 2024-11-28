@@ -11,6 +11,7 @@ use path_slash::PathExt as _;
 pub mod git;
 pub mod merge;
 pub mod stalker2_cfg;
+pub mod unreal_ini;
 
 fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) {
     let pak = repak::PakBuilder::new()
