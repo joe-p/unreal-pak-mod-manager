@@ -5,6 +5,8 @@ use crate::{gsc_cfg, merge};
 use gsc_cfg::GscCfg;
 
 pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), Error> {
+    let branch_name = &normalize_git_ref(branch_name);
+
     // Try to find the branch first
     let branch = match repo.find_branch(branch_name, git2::BranchType::Local) {
         Ok(branch) => branch,
@@ -52,6 +54,8 @@ pub fn merge_branch(
     from_branch: &str,
     strategy: MergeStrategy,
 ) -> Result<(), Error> {
+    let from_branch = &normalize_git_ref(from_branch);
+
     println!(
         "Merging branch: {} with strategy: {:?}",
         from_branch, strategy
@@ -296,4 +300,76 @@ pub fn init_repository(path: &str) -> Result<Repository, Error> {
     } // tree is dropped here, releasing its borrow of repo
 
     Ok(repo)
+}
+
+pub fn normalize_git_ref(input: &str) -> String {
+    let mut result = String::new();
+    let mut last_char: Option<char> = None;
+
+    for c in input.chars() {
+        let replacement = match c {
+            // Replace ASCII control characters, space, ~, ^, :, ?, *, [, \
+            c if c < ' '
+                || c == ' '
+                || c == '~'
+                || c == '^'
+                || c == ':'
+                || c == '?'
+                || c == '*'
+                || c == '['
+                || c == '\\' =>
+            {
+                '_'
+            }
+
+            // Handle slash specially
+            '/' => {
+                if last_char.map_or(true, |lc| lc == '/') {
+                    // Skip consecutive slashes
+                    continue;
+                }
+                '/'
+            }
+
+            // Keep allowed characters
+            c if c.is_ascii_alphanumeric() || c == '-' || c == '_' => c,
+
+            // Replace everything else with underscore
+            _ => '_',
+        };
+
+        // Special cases for dots
+        if replacement == '.' {
+            // Skip if it would create '..' sequence
+            if last_char.map_or(false, |lc| lc == '.') {
+                continue;
+            }
+            // Skip if it would start a component with '.'
+            if last_char.map_or(false, |lc| lc == '/') {
+                continue;
+            }
+        }
+
+        result.push(replacement);
+        last_char = Some(replacement);
+    }
+
+    // Post-processing
+    let mut normalized = result
+        .trim_matches('/') // Remove leading/trailing slashes
+        .replace("@{", "__") // Replace @{ sequence
+        .replace(".lock", "_lock") // Replace .lock at end of components
+        .to_string();
+
+    // Handle special case where result is just "@"
+    if normalized == "@" {
+        normalized = String::from("_");
+    }
+
+    // Remove trailing dots
+    while normalized.ends_with('.') {
+        normalized.pop();
+    }
+
+    normalized
 }
