@@ -7,6 +7,7 @@ use std::{
     path::PathBuf,
 };
 
+use clap::Parser;
 use git2::Repository;
 use path_slash::PathExt as _;
 
@@ -14,6 +15,14 @@ pub mod git;
 pub mod merge;
 pub mod stalker2_cfg;
 pub mod unreal_ini;
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Path to the configuration file
+    #[arg(value_name = "CONFIG_FILE", help = "Path to the configuration file")]
+    config_file: String,
+}
 
 fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) {
     let pak = repak::PakBuilder::new()
@@ -121,7 +130,7 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository, config
     // Sort entries based on their priorities
     entries.sort_by_key(|entry| priority_map.get(&entry.path()).unwrap());
 
-    for entry in entries {
+    for entry in &entries {
         let path = entry.path();
         let branch_name: String = path.file_name().unwrap().to_str().unwrap().to_string();
 
@@ -143,7 +152,10 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository, config
         git::commit_files(repo, &branch_name, false).expect("Failed to commit tracked files");
     }
 
-    for (path, priority) in &priority_map {
+    for entry in &entries {
+        let path = entry.path();
+        let priority = priority_map.get(&path).unwrap();
+
         let branch = git::normalize_git_ref(&path.file_name().unwrap().to_str().unwrap());
 
         println!("{}: Merging with priority {}", branch, priority);
@@ -155,19 +167,14 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository, config
 }
 
 fn main() {
-    use toml::Table;
+    let args = Args::parse();
 
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() != 2 {
-        eprintln!("Usage: {} <config-file>", args[0]);
-        std::process::exit(1);
-    }
-
-    let config_contents = std::fs::read_to_string(&args[1]).expect("Failed to read config file");
-    let config = config_contents.parse::<Table>().unwrap();
+    let config_contents =
+        std::fs::read_to_string(&args.config_file).expect("Failed to read config file");
+    let config = config_contents.parse::<toml::Table>().unwrap();
 
     // Get the config file's directory
-    let config_path = std::path::Path::new(&args[1]);
+    let config_path = std::path::Path::new(&args.config_file);
     let config_dir = config_path
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."));
