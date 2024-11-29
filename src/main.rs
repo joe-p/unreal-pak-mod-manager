@@ -40,18 +40,50 @@ struct UpmmConfig {
     // The directory can contain either:
     // - Directories that are essentially unpacked .pak files (assumes default mount point of "../../../")
     // - .pak files
-    input_dir: String,
+    mods_dir: String,
 
     // mods.<mod_name> allows you to set mod-specific options
     mods: Option<HashMap<String, UpmmModConfig>>,
 }
 
+const DEFAULT_CONFIG_FILE: &str = r#"
+# The name of .pak file that is created
+name = "upmm_modpack"
+
+# All directories in this config are relative to the location of this config file
+
+# The directory where all of the files are staged before being added to the .pak file
+# This directory will be a git repository so you can use git to look at the history of the files
+# Each input mod will contain it's own branch and merge commit
+staging_dir = "staging"
+
+# The directory where the mods are located
+# The directory can contain either:
+# - Directories that are essentially unpacked .pak files (assumes default mount point of "../../../")
+# - .pak files
+mods_dir = "mods"
+
+# mods.<mod_name> allows you to set mod-specific options
+
+# mods.<mod_name>.priority sets the order in which the mods are merged into the final mod pack
+# Lower numbers are merged first, meaning changes in mod priority=2 will take priority over changes in mod priority=1
+# Without an explicit priority set, the mods priority is set via alphabetical order
+# For example, "a.pak", "b.pak", and "c.pak" will have priorities 0, 1, and 2 respectively
+# As such, it's recommended to set priorities above 1000 and below -1000 to ensure adding new mods won't affect existing priorities
+
+# [mods."zzzz_Grok_Boar-40pHP_P.pak"]
+# priority = -1000 # Merge this mod first
+"#;
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Path to the configuration file
-    #[arg(value_name = "CONFIG_FILE", help = "Path to the configuration file")]
-    config_file: String,
+    #[arg(
+        value_name = "CONFIG_FILE",
+        help = "Path to the configuration file. If not given, assume config.toml in current directory. If config.toml is not found, create it."
+    )]
+    config_file: Option<String>,
 }
 
 fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) -> Result<(), repak::Error> {
@@ -91,8 +123,8 @@ fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) -> Result<(),
     Ok(())
 }
 
-fn process_all_input_dirs(
-    input_dir: &std::path::Path,
+fn process_all_mods_dirs(
+    mods_dir: &std::path::Path,
     repo: &Repository,
     config: &UpmmConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -147,7 +179,7 @@ fn process_all_input_dirs(
         Ok(())
     }
 
-    let mut entries: Vec<_> = std::fs::read_dir(input_dir)?
+    let mut entries: Vec<_> = std::fs::read_dir(mods_dir)?
         .filter_map(Result::ok)
         .collect();
 
@@ -262,10 +294,34 @@ fn create_modpack(config_path: &std::path::Path) -> Result<(), Box<dyn std::erro
     let repo: Repository = git::init_repository(full_staging_dir.to_str().unwrap())
         .expect("Failed to initialize modpack repository");
 
-    let input_dir = config.input_dir.clone();
-    let full_input_dir = config_dir.join(input_dir);
+    let mods_dir = config.mods_dir.clone();
+    let full_mods_dir = config_dir.join(mods_dir);
 
-    process_all_input_dirs(&full_input_dir, &repo, &config)
+    if !full_mods_dir.exists() {
+        println!("Mods directory does not exist, creating it...");
+        std::fs::create_dir_all(&full_mods_dir)?;
+        let absolute_mods_dir: PathBuf = fs::canonicalize(&full_mods_dir)?;
+
+        println!(
+            "Created mods directory, put pak files here and run this program again to create a modpack: {}",
+            absolute_mods_dir.display()
+        );
+
+        println!("Press Enter to exit...");
+        std::io::stdin().read_line(&mut String::new()).unwrap();
+        return Ok(());
+    }
+
+    if std::fs::read_dir(&full_mods_dir)?.count() == 0 {
+        let absolute_mods_dir: PathBuf = fs::canonicalize(&full_mods_dir)?;
+
+        println!("Mods directory is empty, put pak files here and run this program again to create a modpack: {}", absolute_mods_dir.display());
+        println!("Press Enter to exit...");
+        std::io::stdin().read_line(&mut String::new()).unwrap();
+        return Ok(());
+    }
+
+    process_all_mods_dirs(&full_mods_dir, &repo, &config)
         .expect("Failed to process all input directories");
 
     let name = config.name;
@@ -312,6 +368,24 @@ fn create_modpack(config_path: &std::path::Path) -> Result<(), Box<dyn std::erro
 
 fn main() {
     let args = Args::parse();
-    let config_path = std::path::Path::new(&args.config_file);
-    create_modpack(config_path).expect("Failed to create modpack");
+
+    let config_path = match args.config_file {
+        None => {
+            let default_path = PathBuf::from("config.toml");
+            if !default_path.exists() {
+                std::fs::write(&default_path, DEFAULT_CONFIG_FILE)
+                    .expect("Failed to write default config file");
+
+                let absolute_path = fs::canonicalize(&default_path).expect(
+                        "should not have a problem getting the absolute path of the default config file"
+                    );
+                println!("Created default config file: {}", absolute_path.display());
+            }
+
+            default_path
+        }
+        Some(path) => PathBuf::from(path),
+    };
+
+    create_modpack(&config_path).expect("Failed to create modpack");
 }

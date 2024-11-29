@@ -12,7 +12,7 @@ staging_dir = "staging"
 # The directory can contain either:
 # - Directories that are essentially unpacked .pak files (assumes default mount point of "../../../")
 # - .pak files
-input_dir = "mods"
+mods_dir = "mods"
 
 # mods.<mod_name> allows you to set mod-specific options
 
