@@ -75,7 +75,9 @@ impl UnrealIni {
             } else if let Ok((_, (key, value))) = value(line) {
                 sections
                     .get_mut(&current_section)
-                    .unwrap()
+                    .expect(
+                        "should always be able to get the current section since it's never deleted",
+                    )
                     .values
                     .insert(key, value);
             }
@@ -85,13 +87,16 @@ impl UnrealIni {
     }
 }
 
-pub fn merge_unreal_inis(base: &UnrealIni, our: &UnrealIni, their: &UnrealIni) -> UnrealIni {
-    let base_json = serde_json::to_value(&base).unwrap().to_string();
-    let our_json = serde_json::to_value(&our).unwrap().to_string();
-    let their_json = serde_json::to_value(&their).unwrap().to_string();
+pub fn merge_unreal_inis(
+    base: &UnrealIni,
+    our: &UnrealIni,
+    their: &UnrealIni,
+) -> Result<UnrealIni, Box<dyn std::error::Error>> {
+    let base_json = serde_json::to_value(&base)?.to_string();
+    let our_json = serde_json::to_value(&our)?.to_string();
+    let their_json = serde_json::to_value(&their)?.to_string();
 
-    serde_json::from_str::<UnrealIni>(
-        &merge::merge_json_strings(&base_json, &our_json, &their_json).unwrap(),
-    )
-    .unwrap()
+    Ok(serde_json::from_str::<UnrealIni>(
+        &merge::merge_json_strings(&base_json, &our_json, &their_json)?,
+    )?)
 }

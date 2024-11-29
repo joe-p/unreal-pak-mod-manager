@@ -23,7 +23,9 @@ pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), Error
     let branch_ref = branch.get();
 
     // Get the commit that the branch points to
-    let commit = repo.find_commit(branch_ref.target().unwrap())?;
+    let commit = repo.find_commit(branch_ref.target().expect(
+        "should always be able to get the target of the branch reference since we created it",
+    ))?;
 
     // Create a checkout builder and set options
     let mut checkout_builder = git2::build::CheckoutBuilder::new();
@@ -36,7 +38,9 @@ pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), Error
     repo.checkout_tree(commit.as_object(), Some(&mut checkout_builder))?;
 
     // Set HEAD to point to the new branch
-    repo.set_head(branch_ref.name().unwrap())?;
+    repo.set_head(branch_ref.name().expect(
+        "should always be able to get the name of the branch reference since we created it",
+    ))?;
 
     Ok(())
 }
@@ -59,7 +63,9 @@ pub fn merge_branch(
 
     // Get the source branch's commit
     let from = repo.find_branch(from_branch, git2::BranchType::Local)?;
-    let from_commit = repo.find_commit(from.get().target().unwrap())?;
+    let from_commit = repo.find_commit(from.get().target().expect(
+        "should always be able to get the target of the branch reference since we created it",
+    ))?;
 
     // Get the current HEAD commit
     let head = repo.head()?;
@@ -117,8 +123,9 @@ pub fn merge_branch(
                 std::fs::write(&full_path, our_blob.content())
                     .expect("Failed to write restored file");
 
-                repo.index().unwrap().add_path(Path::new(&path))?;
-                repo.index().unwrap().write()?;
+                let mut index = repo.index()?;
+                index.add_path(Path::new(&path))?;
+                index.write()?;
 
                 unhandled_conflicts = true;
 
@@ -157,7 +164,7 @@ fn handle_merge_conflict(
     our_id: git2::Oid,
     their_id: git2::Oid,
     mod_name: &str,
-) -> Result<(), Error> {
+) -> Result<(), Box<dyn std::error::Error>> {
     let base_blob = repo.find_blob(base_id)?;
     let our_blob = repo.find_blob(our_id)?;
     let their_blob = repo.find_blob(their_id)?;
@@ -201,7 +208,7 @@ fn handle_merge_conflict(
             .expect("Failed to merge JSON");
 
         println!("{}: Merged JSON values in {}", mod_name, path);
-        return write_and_stage(repo, path, merged);
+        return Ok(write_and_stage(repo, path, merged)?);
     }
 
     if path.ends_with(".cfg") {
@@ -209,10 +216,10 @@ fn handle_merge_conflict(
         let our_cfg = Stalker2Cfg::from_str(path.to_string(), &our_buf);
         let their_cfg = Stalker2Cfg::from_str(path.to_string(), &their_buf);
 
-        let merged_cfg = stalker2_cfg::merge_cfg_structs(&base_cfg, &our_cfg, &their_cfg);
+        let merged_cfg = stalker2_cfg::merge_cfg_structs(&base_cfg, &our_cfg, &their_cfg)?;
 
         println!("{}: Merged cfg values in {}", mod_name, path);
-        return write_and_stage(repo, path, merged_cfg.to_string());
+        return Ok(write_and_stage(repo, path, merged_cfg.to_string())?);
     }
 
     if path.ends_with(".ini") {
@@ -220,16 +227,16 @@ fn handle_merge_conflict(
         let our_ini = UnrealIni::from_str(&our_buf);
         let their_ini = UnrealIni::from_str(&their_buf);
 
-        let merged_ini = unreal_ini::merge_unreal_inis(&base_ini, &our_ini, &their_ini);
+        let merged_ini = unreal_ini::merge_unreal_inis(&base_ini, &our_ini, &their_ini)?;
 
         println!("{}: Merged ini values in {}", mod_name, path);
-        return write_and_stage(repo, path, merged_ini.to_string());
+        return Ok(write_and_stage(repo, path, merged_ini.to_string())?);
     }
 
-    Err(Error::from_str(&format!(
+    Err(Box::new(Error::from_str(&format!(
         "Failed to resolve conflict for file: {}",
         path
-    )))
+    ))))
 }
 
 pub fn commit_files(repo: &Repository, message: &str, only_new: bool) -> Result<(), Error> {
@@ -237,18 +244,12 @@ pub fn commit_files(repo: &Repository, message: &str, only_new: bool) -> Result<
     let mut files_to_commit = false;
 
     // Add only untracked files
-    let mut cb = |path: &Path, _matched_pathspec: &[u8]| -> i32 {
-        let should_add = if only_new {
-            repo.status_file(path).unwrap().is_wt_new()
-        } else {
-            true
-        };
-
-        if should_add {
+    let mut cb = |path: &Path, _matched_pathspec: &[u8]| {
+        if !only_new || repo.status_file(path).map_or(false, |s| s.is_wt_new()) {
             files_to_commit = true;
-            0 // Add the file
+            0
         } else {
-            1 // Skip the file
+            1
         }
     };
     index.add_all(["*"].iter(), git2::IndexAddOption::DEFAULT, Some(&mut cb))?;
@@ -296,7 +297,7 @@ pub fn init_repository(path: &str) -> Result<Repository, Error> {
         let tree = repo.find_tree(tree_id)?;
 
         // Create the initial commit
-        let signature = git2::Signature::now("Strelok", "The Zone").unwrap();
+        let signature = git2::Signature::now("Strelok", "The Zone")?;
         repo.commit(
             Some("HEAD"),
             &signature,

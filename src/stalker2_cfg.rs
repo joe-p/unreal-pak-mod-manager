@@ -180,13 +180,12 @@ pub fn merge_cfg_structs(
     base: &Stalker2Cfg,
     our: &Stalker2Cfg,
     their: &Stalker2Cfg,
-) -> Stalker2Cfg {
-    let base_json = serde_json::to_value(&base).unwrap().to_string();
-    let our_json = serde_json::to_value(&our).unwrap().to_string();
-    let their_json = serde_json::to_value(&their).unwrap().to_string();
+) -> Result<Stalker2Cfg, Box<dyn std::error::Error>> {
+    let base_json = serde_json::to_value(&base)?.to_string();
+    let our_json = serde_json::to_value(&our)?.to_string();
+    let their_json = serde_json::to_value(&their)?.to_string();
 
-    serde_json::from_str::<Stalker2Cfg>(
-        &merge::merge_json_strings(&base_json, &our_json, &their_json).unwrap(),
-    )
-    .unwrap()
+    Ok(serde_json::from_str::<Stalker2Cfg>(
+        &merge::merge_json_strings(&base_json, &our_json, &their_json)?,
+    )?)
 }

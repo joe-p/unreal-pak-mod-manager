@@ -24,10 +24,8 @@ struct Args {
     config_file: String,
 }
 
-fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) {
-    let pak = repak::PakBuilder::new()
-        .reader(&mut std::io::BufReader::new(File::open(path).unwrap()))
-        .unwrap();
+fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) -> Result<(), repak::Error> {
+    let pak = repak::PakBuilder::new().reader(&mut std::io::BufReader::new(File::open(path)?))?;
 
     // Extract each file
     for entry_path in pak.files() {
@@ -38,71 +36,88 @@ fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) {
 
         println!(
             "{}: Extracting {}",
-            path.file_name().unwrap().to_str().unwrap(),
-            relative_out_path.to_str().unwrap()
+            path.file_name()
+                .expect("should be able to get filename from path")
+                .to_str()
+                .expect("should be able to get str from filename"),
+            relative_out_path
+                .to_str()
+                .expect("should be able to get str from path"),
         );
 
         // Create parent directories
         if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent).unwrap();
+            fs::create_dir_all(parent)?;
         }
 
         // Extract the file
         pak.read_file(
             &entry_path,
-            &mut std::io::BufReader::new(File::open(path).unwrap()),
-            &mut fs::File::create(&out_path).unwrap(),
-        )
-        .unwrap();
+            &mut std::io::BufReader::new(File::open(path)?),
+            &mut fs::File::create(&out_path)?,
+        )?;
     }
+
+    Ok(())
 }
 
-fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository, config: &toml::Table) {
-    fn process_dir(dir: &std::path::Path, root_dir: &std::path::Path, repo: &Repository) {
-        for entry in std::fs::read_dir(dir).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
+fn process_all_input_dirs(
+    input_dir: &std::path::Path,
+    repo: &Repository,
+    config: &toml::Table,
+) -> Result<(), Box<dyn std::error::Error>> {
+    fn process_dir(
+        dir: &std::path::Path,
+        root_dir: &std::path::Path,
+        repo: &Repository,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for entry in std::fs::read_dir(dir)? {
+            let path = entry?.path();
 
             if path.is_dir() {
-                process_dir(&path, root_dir, repo);
+                process_dir(&path, root_dir, repo)?;
             } else {
                 // Path relative to raw dir
-                let relative_path = path.strip_prefix(root_dir).unwrap();
+                let relative_path = path.strip_prefix(root_dir)?;
+                let repo_parent = repo
+                    .path()
+                    .parent()
+                    .expect("should always be able to get the parent of the repo path");
 
                 // Create parent directories
-                if let Some(parent) = repo.path().parent().unwrap().join(relative_path).parent() {
-                    fs::create_dir_all(parent).unwrap();
+                if let Some(parent) = repo_parent.join(relative_path).parent() {
+                    fs::create_dir_all(parent)?;
                 }
 
                 println!(
                     "{}: Copying {}",
-                    root_dir.file_name().unwrap().to_str().unwrap(),
+                    root_dir
+                        .file_name()
+                        .expect("should always be able to get the filename from the root dir")
+                        .to_str()
+                        .expect("should always be able to get the filename from the root dir"),
                     relative_path.display(),
                 );
 
                 // If the file is a JSON file, normalize it
                 if path.extension().map_or(false, |ext| ext == "json") {
-                    let content = std::fs::read_to_string(&path).unwrap();
-                    let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+                    let content = std::fs::read_to_string(&path)?;
+                    let json: serde_json::Value = serde_json::from_str(&content)?;
                     std::fs::write(
-                        repo.path().parent().unwrap().join(relative_path),
-                        serde_json::to_string_pretty(&json).unwrap(),
-                    )
-                    .unwrap();
+                        repo_parent.join(relative_path),
+                        serde_json::to_string_pretty(&json)?,
+                    )?;
                 } else {
                     // Copy the file to the modpack directory
-                    std::fs::copy(
-                        path.as_path(),
-                        repo.path().parent().unwrap().join(relative_path),
-                    )
-                    .unwrap();
+                    std::fs::copy(path.as_path(), repo_parent.join(relative_path))?;
                 }
             }
         }
+
+        Ok(())
     }
 
-    let mut entries: Vec<_> = std::fs::read_dir(input_dir)
-        .unwrap()
+    let mut entries: Vec<_> = std::fs::read_dir(input_dir)?
         .filter_map(Result::ok)
         .collect();
 
@@ -114,7 +129,11 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository, config
 
     for entry in &entries {
         let path = entry.path();
-        let mod_name = path.file_name().unwrap().to_str().unwrap();
+        let mod_name = path
+            .file_name()
+            .expect("should always be able to get the filename from the path")
+            .to_str()
+            .expect("should always be able to get the str from the filename");
 
         let priority = config
             .get("mods")
@@ -128,19 +147,34 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository, config
     }
 
     // Sort entries based on their priorities
-    entries.sort_by_key(|entry| priority_map.get(&entry.path()).unwrap());
+    entries.sort_by_key(|entry| {
+        priority_map
+            .get(&entry.path())
+            .expect("should always be able to get the priority from the priority map")
+    });
 
     for entry in &entries {
         let path = entry.path();
-        let branch_name: String = path.file_name().unwrap().to_str().unwrap().to_string();
+        let branch_name: String = path
+            .file_name()
+            .expect("should always be able to get the filename from the path")
+            .to_str()
+            .expect("should always be able to get the str from the filename")
+            .to_string();
 
         // First add untracked files to master
         git::checkout_branch(repo, "master").expect("Failed to checkout master");
 
         if path.is_dir() {
-            process_dir(&path, &path, repo);
+            process_dir(&path, &path, repo)?;
         } else if path.extension().map_or(false, |ext| ext == "pak") {
-            unpak_pak(&path, &repo.path().parent().unwrap());
+            unpak_pak(
+                &path,
+                &repo
+                    .path()
+                    .parent()
+                    .expect("should always be able to get the parent of the repo path"),
+            )?;
         } else {
             panic!("Unknown file type: {}", path.display());
         }
@@ -154,9 +188,16 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository, config
 
     for entry in &entries {
         let path = entry.path();
-        let priority = priority_map.get(&path).unwrap();
+        let priority = priority_map
+            .get(&path)
+            .expect("should always be able to get the priority from the priority map");
 
-        let branch = git::normalize_git_ref(&path.file_name().unwrap().to_str().unwrap());
+        let branch = git::normalize_git_ref(
+            path.file_name()
+                .expect("should always be able to get the filename from the path")
+                .to_str()
+                .expect("should always be able to get the str from the filename"),
+        );
 
         println!("{}: Merging with priority {}", branch, priority);
 
@@ -164,6 +205,8 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository, config
         git::merge_branch(repo, &branch, git::MergeStrategy::Custom)
             .expect("Failed to merge branch");
     }
+
+    Ok(())
 }
 
 fn main() {
@@ -197,7 +240,8 @@ fn main() {
     let input_dir = config["input_dir"].as_str().unwrap();
     let full_input_dir = config_dir.join(input_dir);
 
-    process_all_input_dirs(&full_input_dir, &repo, &config);
+    process_all_input_dirs(&full_input_dir, &repo, &config)
+        .expect("Failed to process all input directories");
 
     let name = config["name"].as_str().unwrap();
     let pak_path = config_dir.join(format!("{}.pak", name));
