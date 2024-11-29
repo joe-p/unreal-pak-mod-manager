@@ -50,15 +50,12 @@ impl UnrealIni {
         }
 
         fn value(input: &str) -> IResult<&str, (String, String)> {
-            println!("Looking for value in: {}", input);
             let (input, _) = multispace0(input)?;
             let (input, key) = take_till(|c: char| c.is_whitespace() || c == '=')(input)?;
             let (input, _) = multispace0(input)?;
             let (input, _) = tag("=")(input)?;
             let (input, _) = multispace0(input)?;
             let (input, value) = not_line_ending(input)?;
-
-            println!("Found value: {} = {}", key, value);
 
             Ok((input, (key.to_string(), value.to_string())))
         }

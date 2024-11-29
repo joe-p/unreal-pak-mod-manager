@@ -49,7 +49,6 @@ However, if we use this tool to create a modpack, we'd end up with both changes 
 
 These are planned features in rough order of priority
 
-- Better logging
 - Allow setting custom priorities for specific mods (currently uses alphabetical order)
 - Basic GUI
 

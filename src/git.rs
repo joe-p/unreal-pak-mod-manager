@@ -19,8 +19,6 @@ pub fn checkout_branch(repo: &Repository, branch_name: &str) -> Result<(), Error
         }
     };
 
-    println!("Branch: {:?}", branch.name().unwrap());
-
     // Get the branch's reference
     let branch_ref = branch.get();
 
@@ -57,10 +55,8 @@ pub fn merge_branch(
 ) -> Result<(), Error> {
     let from_branch = &normalize_git_ref(from_branch);
 
-    println!(
-        "Merging branch: {} with strategy: {:?}",
-        from_branch, strategy
-    );
+    println!("{}: Merging files", from_branch);
+
     // Get the source branch's commit
     let from = repo.find_branch(from_branch, git2::BranchType::Local)?;
     let from_commit = repo.find_commit(from.get().target().unwrap())?;
@@ -87,6 +83,11 @@ pub fn merge_branch(
     // Get conflicted files
     let mut unhandled_conflicts = false;
     let index = repo.index()?;
+
+    if index.conflicts()?.count() == 0 {
+        println!("{}: All files merged without conflicts", from_branch);
+    }
+
     for entry in index.conflicts()? {
         let conflict = entry?;
 
@@ -106,13 +107,9 @@ pub fn merge_branch(
                 .expect("No ancestor");
 
             // Handle potential error from merge conflict resolution
-            if let Err(e) = handle_merge_conflict(repo, &path, ancestor_id, our_id, their_id) {
-                println!("{}: Will try again...", e);
-
-                // This keeps their file
-                // repo.index().unwrap().remove_path(Path::new(&path))?;
-                // repo.index().unwrap().write()?;
-
+            if let Err(_e) =
+                handle_merge_conflict(repo, &path, ancestor_id, our_id, their_id, &from_branch)
+            {
                 // Overwrite the current file content with ours
                 let our_blob = repo.find_blob(our_id)?;
                 let workdir = repo.workdir().expect("Repository has no working directory");
@@ -159,9 +156,8 @@ fn handle_merge_conflict(
     base_id: git2::Oid,
     our_id: git2::Oid,
     their_id: git2::Oid,
+    mod_name: &str,
 ) -> Result<(), Error> {
-    println!("Conflict in file: {}", path);
-
     let base_blob = repo.find_blob(base_id)?;
     let our_blob = repo.find_blob(our_id)?;
     let their_blob = repo.find_blob(their_id)?;
@@ -203,6 +199,8 @@ fn handle_merge_conflict(
     if path.ends_with(".json") {
         let merged = merge::merge_json_strings(&base_buf, &our_buf, &their_buf)
             .expect("Failed to merge JSON");
+
+        println!("{}: Merged JSON values in {}", mod_name, path);
         return write_and_stage(repo, path, merged);
     }
 
@@ -213,6 +211,7 @@ fn handle_merge_conflict(
 
         let merged_cfg = stalker2_cfg::merge_cfg_structs(&base_cfg, &our_cfg, &their_cfg);
 
+        println!("{}: Merged cfg values in {}", mod_name, path);
         return write_and_stage(repo, path, merged_cfg.to_string());
     }
 
@@ -223,6 +222,7 @@ fn handle_merge_conflict(
 
         let merged_ini = unreal_ini::merge_unreal_inis(&base_ini, &our_ini, &their_ini);
 
+        println!("{}: Merged ini values in {}", mod_name, path);
         return write_and_stage(repo, path, merged_ini.to_string());
     }
 
@@ -246,7 +246,6 @@ pub fn commit_files(repo: &Repository, message: &str, only_new: bool) -> Result<
 
         if should_add {
             files_to_commit = true;
-            println!("Adding file: {}", path.display());
             0 // Add the file
         } else {
             1 // Skip the file
@@ -271,7 +270,7 @@ pub fn commit_files(repo: &Repository, message: &str, only_new: bool) -> Result<
 
     // Create the commit
     let signature = repo.signature()?;
-    let commit = repo.commit(
+    repo.commit(
         Some("HEAD"),
         &signature,
         &signature,
@@ -279,8 +278,6 @@ pub fn commit_files(repo: &Repository, message: &str, only_new: bool) -> Result<
         &tree,
         &[&parent_commit],
     )?;
-
-    println!("Commit: {:?}", commit);
 
     Ok(())
 }

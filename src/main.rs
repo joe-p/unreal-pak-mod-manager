@@ -3,6 +3,7 @@ extern crate git2;
 use std::{
     fs::{self, File},
     io::BufWriter,
+    path::PathBuf,
 };
 
 use git2::Repository;
@@ -20,10 +21,16 @@ fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) {
 
     // Extract each file
     for entry_path in pak.files() {
-        let out_path = output_dir
-            .join(pak.mount_point().replace("../../../", ""))
-            .join(&entry_path);
-        println!("Extracting {} to {}", entry_path, out_path.display());
+        let relative_out_path =
+            PathBuf::from(pak.mount_point().replace("../../../", "")).join(&entry_path);
+
+        let out_path = output_dir.join(&relative_out_path);
+
+        println!(
+            "{}: Extracting {}",
+            path.file_name().unwrap().to_str().unwrap(),
+            relative_out_path.to_str().unwrap()
+        );
 
         // Create parent directories
         if let Some(parent) = out_path.parent() {
@@ -58,14 +65,13 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
                 }
 
                 println!(
-                    "Copying {} to {}",
-                    path.display(),
-                    repo.path().parent().unwrap().display()
+                    "{}: Copying {}",
+                    root_dir.file_name().unwrap().to_str().unwrap(),
+                    relative_path.display(),
                 );
 
                 // If the file is a JSON file, normalize it
                 if path.extension().map_or(false, |ext| ext == "json") {
-                    println!("Normalizing JSON file: {}", path.display());
                     let content = std::fs::read_to_string(&path).unwrap();
                     let json: serde_json::Value = serde_json::from_str(&content).unwrap();
                     std::fs::write(
@@ -99,8 +105,6 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
         let path = entry.path();
         let branch_name: String = path.file_name().unwrap().to_str().unwrap().to_string();
 
-        println!("Processing branch: {}", branch_name);
-
         // First add untracked files to master
         git::checkout_branch(repo, "master").expect("Failed to checkout master");
 
@@ -115,7 +119,6 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
         git::commit_files(repo, &branch_name, true).expect("Failed to commit untracked_files");
 
         // Now checkout branch for this root dir and add tracked files
-        println!("Checking out branch: {}", branch_name);
         git::checkout_branch(repo, &branch_name).expect("Failed to checkout branch");
         git::commit_files(repo, &branch_name, false).expect("Failed to commit tracked files");
 
@@ -170,8 +173,9 @@ fn main() {
 
     let name = config["name"].as_str().unwrap();
     let pak_path = config_dir.join(format!("{}.pak", name));
+    let pak_name = pak_path.file_name().unwrap().to_str().unwrap().to_owned();
     let mut pak = repak::PakBuilder::new().writer(
-        BufWriter::new(File::create(pak_path).expect("Failed to create pak file")),
+        BufWriter::new(File::create(&pak_path).expect("Failed to create pak file")),
         repak::Version::V8B,
         "../../../".to_string(),
         None,
@@ -198,9 +202,9 @@ fn main() {
     collect_pak_files(&full_staging_dir, &mut pak_files);
 
     for path in pak_files {
-        let pak_path = path.strip_prefix(&full_staging_dir).unwrap();
-        let path_slash = pak_path.to_slash().unwrap();
-        println!("Adding {} to pak", path_slash);
+        let file_path = path.strip_prefix(&full_staging_dir).unwrap();
+        let path_slash = file_path.to_slash().unwrap();
+        println!("{}: Packing {}", pak_name, path_slash);
         pak.write_file(&path_slash, fs::read(&path).unwrap())
             .unwrap();
     }
