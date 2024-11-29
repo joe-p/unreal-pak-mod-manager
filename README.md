@@ -45,12 +45,6 @@ However, if we use this tool to create a modpack, we'd end up with both changes 
 { "a": 1, "b": 3, "c": 4 }
 ```
 
-#### Planned Features
-
-These are planned features in rough order of priority
-
-- Basic GUI
-
 ### Usage
 
 The functionality of this tool is entirely driven by a single toml configuration file that is passed as a command line argument.
