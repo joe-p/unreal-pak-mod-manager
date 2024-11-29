@@ -49,31 +49,12 @@ However, if we use this tool to create a modpack, we'd end up with both changes 
 
 These are planned features in rough order of priority
 
-- Allow setting custom priorities for specific mods (currently uses alphabetical order)
 - Basic GUI
 
 ### Usage
 
-The functionality of this tool is entirely driven by a single toml configuration file.
+The functionality of this tool is entirely driven by a single toml configuration file that is passed as a command line argument.
 
-From [example/config.toml](example/config.toml):
+See [example/config.toml](example/config.toml) for an example:
 
-```toml
-# The name of .pak file that is created
-name = "example_modpack"
-
-# All directories in this config are relative to the location of this config file
-
-# The directory where all of the files are staged before being added to the .pak file
-# This directory will be a git repository so you can use git to look at the history of the files
-# Each input mod will contain it's own branch and merge commit
-staging_dir = "staging"
-
-# The directory where the mods are located
-# The directory can contain either:
-# - Directories that are essentially unpacked .pak files (assumes default mount point of "../../../")
-# - .pak files
-input_dir = "mods"
-```
-
-Running `cargo build && ./target/debug/unreal-pak-mod-manager example/config.toml` will then create the modpack with all the mods in [example/mods](example/mods) and pack them in [example/example_modpack.pak](example/example_modpack.pak).
+Running `cargo run example/config.toml` will then create the modpack with all the mods in [example/mods](example/mods) and pack them in [example/example_modpack.pak](example/example_modpack.pak).

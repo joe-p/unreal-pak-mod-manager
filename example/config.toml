@@ -13,3 +13,23 @@ staging_dir = "staging"
 # - Directories that are essentially unpacked .pak files (assumes default mount point of "../../../")
 # - .pak files
 input_dir = "mods"
+
+# mods.<mod_name> allows you to set mod-specific options
+
+# mods.<mod_name>.priority sets the order in which the mods are merged into the final mod pack
+# Lower numbers are merged first, meaning changes in mod priority=2 will take priority over changes in mod priority=1
+# Without an explicit priority set, the mods priority is set via alphabetical order
+# For example, "a.pak", "b.pak", and "c.pak" will have priorities 0, 1, and 2 respectively
+# As such, it's recommended to set priorities above 1000 and below -1000 to ensure adding new mods won't affect existing priorities
+
+[mods."zzzz_Grok_Boar-40pHP_P.pak"]
+priority = -1000 # Merge this mod first
+
+[mods."abc"]
+priority = 1000 # Merge this mod 3rd to last
+
+[mods."increment_b"]
+priority = 1001 # Merge this mod 2nd to last
+
+[mods."increment_c"]
+priority = 1002 # Merge this mod last

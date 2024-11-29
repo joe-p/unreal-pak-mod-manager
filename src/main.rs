@@ -1,6 +1,7 @@
 extern crate git2;
 
 use std::{
+    collections::HashMap,
     fs::{self, File},
     io::BufWriter,
     path::PathBuf,
@@ -47,7 +48,7 @@ fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) {
     }
 }
 
-fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
+fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository, config: &toml::Table) {
     fn process_dir(dir: &std::path::Path, root_dir: &std::path::Path, repo: &Repository) {
         for entry in std::fs::read_dir(dir).unwrap() {
             let entry = entry.unwrap();
@@ -91,8 +92,6 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
         }
     }
 
-    let mut branches: Vec<String> = Vec::new();
-
     let mut entries: Vec<_> = std::fs::read_dir(input_dir)
         .unwrap()
         .filter_map(Result::ok)
@@ -100,6 +99,27 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
 
     // Sort entries by name, this will ensure decrease_health comes before decrease_health_again
     entries.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+
+    let mut priority_map: HashMap<PathBuf, i64> = HashMap::new();
+    let mut current_idx = 0;
+
+    for entry in &entries {
+        let path = entry.path();
+        let mod_name = path.file_name().unwrap().to_str().unwrap();
+
+        let priority = config
+            .get("mods")
+            .and_then(|v| v.get(mod_name))
+            .and_then(|v| v.get("priority"))
+            .and_then(|v| v.as_integer())
+            .unwrap_or(current_idx);
+
+        priority_map.insert(path, priority);
+        current_idx += 1;
+    }
+
+    // Sort entries based on their priorities
+    entries.sort_by_key(|entry| priority_map.get(&entry.path()).unwrap());
 
     for entry in entries {
         let path = entry.path();
@@ -121,12 +141,13 @@ fn process_all_input_dirs(input_dir: &std::path::Path, repo: &Repository) {
         // Now checkout branch for this root dir and add tracked files
         git::checkout_branch(repo, &branch_name).expect("Failed to checkout branch");
         git::commit_files(repo, &branch_name, false).expect("Failed to commit tracked files");
-
-        branches.push(branch_name);
     }
 
-    // Merge all branches into master
-    for branch in branches {
+    for (path, priority) in &priority_map {
+        let branch = git::normalize_git_ref(&path.file_name().unwrap().to_str().unwrap());
+
+        println!("{}: Merging with priority {}", branch, priority);
+
         git::checkout_branch(repo, "master").expect("Failed to checkout master");
         git::merge_branch(repo, &branch, git::MergeStrategy::Custom)
             .expect("Failed to merge branch");
@@ -169,7 +190,7 @@ fn main() {
     let input_dir = config["input_dir"].as_str().unwrap();
     let full_input_dir = config_dir.join(input_dir);
 
-    process_all_input_dirs(&full_input_dir, &repo);
+    process_all_input_dirs(&full_input_dir, &repo, &config);
 
     let name = config["name"].as_str().unwrap();
     let pak_path = config_dir.join(format!("{}.pak", name));
