@@ -242,6 +242,16 @@ fn process_all_mods_dirs(
             .expect("should always be able to get the priority from the priority map")
     });
 
+    println!("Processing the mods in the following order:");
+    for entry in &entries {
+        let path = entry.path();
+        let priority = priority_map
+            .get(&path)
+            .expect("should always be able to get the priority from the priority map");
+
+        println!("{}: {}", priority, path.display());
+    }
+
     for entry in &entries {
         let path = entry.path();
         let branch_name: String = path
