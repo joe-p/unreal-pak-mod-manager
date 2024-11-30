@@ -1,6 +1,6 @@
 # Unreal Pak Mod Manager
 
-This tool is used to create a single .pak file from a collection of mods for an Unreal Engine game. The initial focus will be on supporting STALKER 2, but more games may be supported in the future.
+This tool is used to create a single .pak file from a collection of mods for an Unreal Engine game. The initial focus will be on supporting STALKER 2 pak mods (notably cfg mods and .ini mods), but more games and file formats may be supported in the future.
 
 ## Purpose
 
