@@ -165,3 +165,8 @@ If you are using a mod that contains one of these files or encounter similar syn
 ### Why does Windows defender warn me when I try to use this tool?
 
 By default, Windows defender will warn you any time you use an unsigned exe for the first time. This DOES NOT mean it is a virus, it's just Windows making sure you know what you are running and should go away after the first time you run it. I could fix this by signing the exe, but I need to pay for a proper signing key. If this tool sees adoption, I will look into signing it to avoid this. If you are still skeptical, you can clone this repo yourself and build via `cargo build --release --target x86_64-pc-windows-gnu`
+
+
+### How can I see what changes were made?
+
+By default, the tool will create a `staging` directory that contains all of the files before they are packed. You can look at these files to see the final result that is in the modpack. This `staging` directory is a git repository, so you can also use `git` to view a history of how the files changed over time as mods were merged in. I eventually plan to add an easier way to review changes for those that aren't familiar with git.
