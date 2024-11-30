@@ -46,7 +46,7 @@ Some cfg files that are shipped with the game are *seemingly* malformed. The mos
    struct.end
 ```
 
-It's entirely possible that this is the intended syntax of CFG files, but since it's so rare I am missing it is not intentional thus the parser will throw an error when encoutering these files. Since I doubt these are commonly modded files, that seems to be acceptable for now. I have ran this tool against every single file in `pakchunk0` to ensure every file can be parsed properly. Below are the ones that will cause the tool to throw an error:
+It's entirely possible that this is the intended syntax of CFG files, but since it's so rare I am assuming it is not intentional thus the parser will throw an error when encoutering these files. Since I doubt these are commonly modded files, that seems to be acceptable for now. I have ran this tool against every single file in `pakchunk0` to ensure every file can be parsed properly. Below are the ones that will cause the tool to throw an error:
 
 
 ```
