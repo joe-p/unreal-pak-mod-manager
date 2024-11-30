@@ -91,7 +91,7 @@ pub fn merge_unreal_inis(
     base: &UnrealIni,
     our: &UnrealIni,
     their: &UnrealIni,
-) -> Result<UnrealIni, Box<dyn std::error::Error>> {
+) -> anyhow::Result<UnrealIni> {
     let base_json = serde_json::to_value(&base)?.to_string();
     let our_json = serde_json::to_value(&our)?.to_string();
     let their_json = serde_json::to_value(&their)?.to_string();

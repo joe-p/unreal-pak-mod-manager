@@ -2,7 +2,7 @@ pub fn merge_json_strings(
     base: &str,
     ours: &str,
     theirs: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> anyhow::Result<String> {
     // Parse the JSON strings into Value objects
     let mut base_json: serde_json::Value = serde_json::from_str(base)?;
     let our_json: serde_json::Value = serde_json::from_str(ours)?;

@@ -10,6 +10,7 @@ use std::{
 use clap::Parser;
 use git2::Repository;
 use path_slash::PathExt as _;
+use anyhow::{Context, Result};
 
 pub mod git;
 pub mod merge;
@@ -89,9 +90,9 @@ struct Args {
 fn unpak_pak(
     path: &std::path::Path,
     output_dir: &std::path::Path,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     let pak = repak::PakBuilder::new().reader(&mut std::io::BufReader::new(
-        File::open(path).map_err(|e| format!("Failed to open pak file '{}': {}", path.display(), e))?
+        File::open(path).with_context(|| format!("Failed to open pak file '{}'", path.display()))?
     ))?;
 
     // Extract each file
@@ -115,7 +116,7 @@ fn unpak_pak(
         // Create parent directories
         if let Some(parent) = out_path.parent() {
             fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create directory '{}': {}", parent.display(), e))?;
+                .with_context(|| format!("Failed to create directory '{}'", parent.display()))?;
         }
 
         // Extract the file to a string first
@@ -129,7 +130,7 @@ fn unpak_pak(
         // Normalize and write the content
         let content_str = String::from_utf8_lossy(&content);
         let normalized = normalize_content(&out_path, &content_str)?;
-        fs::write(&out_path, normalized).map_err(|e| format!("failed to write to {}: {}", &out_path.to_str().unwrap(), e))?;
+        fs::write(&out_path, normalized).context( format!("failed to write to {}", &out_path.to_str().context("Failed to get str from path")?))?;
     }
 
     Ok(())
@@ -138,11 +139,11 @@ fn unpak_pak(
 fn normalize_content(
     path: &std::path::Path,
     content: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<String> {
     match path.extension().and_then(|ext| ext.to_str()) {
         Some("json") => {
             let json: serde_json::Value = serde_json::from_str(&content)?;
-            return Ok(serde_json::to_string_pretty(&json)?);
+            Ok(serde_json::to_string_pretty(&json)?)
         }
         Some("cfg") => {
             let cfg = stalker2_cfg::Stalker2Cfg::from_str(
@@ -151,14 +152,12 @@ fn normalize_content(
                     .to_str()
                     .expect("should always be able to get the str from the filename")
                     .to_string(),
-                &content,
+                content,
             )?;
 
-            return Ok(format!("{}", cfg));
+            Ok(cfg.to_string())
         }
-        _ => {
-            return Ok(content.to_string());
-        }
+        _ => Ok(content.to_string())
     }
 }
 
@@ -166,16 +165,16 @@ fn process_all_mods_dirs(
     mods_dir: &std::path::Path,
     repo: &Repository,
     config: &UpmmConfig,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     fn process_dir(
         dir: &std::path::Path,
         root_dir: &std::path::Path,
         repo: &Repository,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<()> {
         for entry in std::fs::read_dir(dir)
-            .map_err(|e| format!("Failed to read directory '{}': {}", dir.display(), e))? {
+            .with_context(|| format!("Failed to read directory '{}'", dir.display()))? {
             let path = entry
-                .map_err(|e| format!("Failed to read directory entry: {}", e))?.path();
+                .with_context(|| "Failed to read directory entry")?.path();
 
             if path.is_dir() {
                 process_dir(&path, root_dir, repo)?;
@@ -190,7 +189,7 @@ fn process_all_mods_dirs(
                 // Create parent directories
                 if let Some(parent) = repo_parent.join(relative_path).parent() {
                     fs::create_dir_all(parent)
-                        .map_err(|e| format!("Failed to create directory '{}': {}", parent.display(), e))?;
+                        .with_context(|| format!("Failed to create directory '{}'", parent.display()))?;
                 }
 
                 println!(
@@ -204,10 +203,10 @@ fn process_all_mods_dirs(
                 );
 
                 let content = normalize_content(&path, &std::fs::read_to_string(&path)
-                    .map_err(|e| format!("Failed to read file '{}': {}", path.display(), e))?)?;
+                    .context(format!("Failed to read file '{}'", path.display()))?)?;
 
                 std::fs::write(repo_parent.join(relative_path), content)
-                    .map_err(|e| format!("Failed to write file '{}': {}", relative_path.display(), e))?;
+                    .context(format!("Failed to write file '{}'", relative_path.display()))?;
             }
         }
 
@@ -215,7 +214,7 @@ fn process_all_mods_dirs(
     }
 
     let mut entries: Vec<_> = std::fs::read_dir(mods_dir)
-        .map_err(|e| format!("Failed to read mods directory '{}': {}", mods_dir.display(), e))?
+        .with_context(|| format!("Failed to read mods directory '{}'", mods_dir.display()))?
         .filter_map(Result::ok)
         .collect();
 
@@ -317,9 +316,9 @@ fn process_all_mods_dirs(
     Ok(())
 }
 
-fn create_modpack(config_path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+fn create_modpack(config_path: &std::path::Path) -> Result<()> {
     let config_contents = std::fs::read_to_string(config_path)
-        .map_err(|e| format!("Failed to read config file '{}': {}", config_path.display(), e))?;
+        .with_context(|| format!("Failed to read config file '{}'", config_path.display()))?;
     let config: UpmmConfig = toml::from_str(&config_contents)?;
 
     // Get the config file's directory
@@ -333,13 +332,13 @@ fn create_modpack(config_path: &std::path::Path) -> Result<(), Box<dyn std::erro
     // Delete the modpack directory if it exists
     if full_staging_dir.exists() {
         std::fs::remove_dir_all(full_staging_dir.clone())
-            .expect("Failed to delete modpack directory");
+            .with_context(|| format!("Failed to delete modpack directory"))?;
     }
 
     std::fs::create_dir_all(full_staging_dir.clone())
-        .map_err(|e| format!("Failed to create modpack directory '{}': {}", full_staging_dir.display(), e))?;
+        .with_context(|| format!("Failed to create modpack directory '{}'", full_staging_dir.display()))?;
 
-    let repo: Repository = git::init_repository(full_staging_dir.to_str().unwrap())
+    let repo: Repository = git::init_repository(full_staging_dir.to_str().context("Failed to get staging dir str")?)
         .expect("Failed to initialize modpack repository");
 
     let mods_dir = config.mods_dir.clone();
@@ -347,9 +346,9 @@ fn create_modpack(config_path: &std::path::Path) -> Result<(), Box<dyn std::erro
 
     if !full_mods_dir.exists() {
         std::fs::create_dir_all(&full_mods_dir)
-            .map_err(|e| format!("Failed to create mods directory '{}': {}", full_mods_dir.display(), e))?;
+            .with_context(|| format!("Failed to create mods directory '{}'", full_mods_dir.display()))?;
         let absolute_mods_dir: PathBuf = fs::canonicalize(&full_mods_dir)
-            .map_err(|e| format!("Failed to get absolute path for '{}': {}", full_mods_dir.display(), e))?;
+            .with_context(|| format!("Failed to get absolute path for '{}'", full_mods_dir.display()))?;
 
         println!(
             "Created mods directory, put pak files here and run this program again to create a modpack: {}",
@@ -357,7 +356,7 @@ fn create_modpack(config_path: &std::path::Path) -> Result<(), Box<dyn std::erro
         );
 
         println!("Press Enter to exit...");
-        std::io::stdin().read_line(&mut String::new()).unwrap();
+        std::io::stdin().read_line(&mut String::new())?;
         return Ok(());
     }
 
@@ -366,16 +365,16 @@ fn create_modpack(config_path: &std::path::Path) -> Result<(), Box<dyn std::erro
 
         println!("Mods directory is empty, put pak files here and run this program again to create a modpack: {}", absolute_mods_dir.display());
         println!("Press Enter to exit...");
-        std::io::stdin().read_line(&mut String::new()).unwrap();
+        std::io::stdin().read_line(&mut String::new())?;
         return Ok(());
     }
 
     process_all_mods_dirs(&full_mods_dir, &repo, &config)
-        .expect("Failed to process all input directories");
+        .with_context(|| "Failed to process all input directories")?;
 
     let name = config.name;
     let pak_path = config_dir.join(format!("{}.pak", name));
-    let pak_name = pak_path.file_name().unwrap().to_str().unwrap().to_owned();
+    let pak_name = pak_path.file_name().context("Failed to get pak file name")?.to_str().context("Failed to get file str")?.to_owned();
     let mut pak = repak::PakBuilder::new().writer(
         BufWriter::new(File::create(&pak_path).expect("Failed to create pak file")),
         repak::Version::V8B,
@@ -383,39 +382,43 @@ fn create_modpack(config_path: &std::path::Path) -> Result<(), Box<dyn std::erro
         None,
     );
 
-    fn collect_pak_files(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
-        for entry in fs::read_dir(dir).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
+    fn collect_pak_files(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) -> Result<()> {
+        for entry in fs::read_dir(dir).context(format!("Failed to read dir {}", dir.display()))? {
+            let entry = entry;
+            let path = entry?.path();
 
-            if path.file_name().unwrap() == ".git" {
+            if path.file_name().context("Failed to get filename")? == ".git" {
                 continue;
             }
 
             if path.is_dir() {
-                collect_pak_files(&path, files);
+                collect_pak_files(&path, files)?;
             } else {
                 files.push(path);
             }
         }
+
+        Ok(())
     }
 
     let mut pak_files = Vec::new();
-    collect_pak_files(&full_staging_dir, &mut pak_files);
+    collect_pak_files(&full_staging_dir, &mut pak_files)?;
 
     for path in pak_files {
-        let file_path = path.strip_prefix(&full_staging_dir).unwrap();
-        let path_slash = file_path.to_slash().unwrap();
+        let file_path = path.strip_prefix(&full_staging_dir)?;
+        let path_slash = file_path.to_slash().context("Failed to get slash")?;
         println!("{}: Packing {}", pak_name, path_slash);
-        pak.write_file(&path_slash, fs::read(&path).unwrap())
-            .unwrap();
+        pak.write_file(&path_slash, fs::read(&path).expect(&format!("Failed to read {}", path.display())))
+            .expect(&format!("Failed to write {} to {}", path_slash, path.display()));
     }
 
-    pak.write_index().unwrap();
+    pak.write_index()?;
+
+    println!("{} created successfully!", pak_path.display());
     Ok(())
 }
 
-fn main() {
+fn run() -> Result<(), anyhow::Error> {
     let args = Args::parse();
 
     let config_path = match args.config_file {
@@ -423,11 +426,10 @@ fn main() {
             let default_path = PathBuf::from("config.toml");
             if !default_path.exists() {
                 std::fs::write(&default_path, DEFAULT_CONFIG_FILE)
-                    .expect("Failed to write default config file");
+                    .context("Failed to write default config file")?;
 
-                let absolute_path = fs::canonicalize(&default_path).expect(
-                        "should not have a problem getting the absolute path of the default config file"
-                    );
+                let absolute_path = fs::canonicalize(&default_path)
+                    .context("Failed to get absolute path of default config file")?;
                 println!("Created default config file: {}", absolute_path.display());
             }
 
@@ -436,8 +438,23 @@ fn main() {
         Some(path) => PathBuf::from(path),
     };
 
-    create_modpack(&config_path).expect("Failed to create modpack");
+    create_modpack(&config_path)?;
+
+    Ok(())
+}
+
+fn main() {
+    let result = run();
+
+    if let Err(e) = &result {
+        eprintln!("Error: {:#}", e);
+    }
 
     println!("Press Enter to exit...");
     std::io::stdin().read_line(&mut String::new()).unwrap();
+
+    if result.is_err() {
+        std::process::exit(1);
+    }
 }
+

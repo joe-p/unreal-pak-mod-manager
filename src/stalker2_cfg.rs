@@ -82,7 +82,7 @@ impl Stalker2Cfg {
         result
     }
 
-    pub fn from_str(name: String, cfg_str: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_str(name: String, cfg_str: &str) -> anyhow::Result<Self> {
         let mut root_structs: Vec<DefaultKey> = Vec::new();
         let mut structs: SlotMap<DefaultKey, Stalker2CfgStruct> = SlotMap::new();
         let mut current_struct_key: Option<DefaultKey> = None;
@@ -180,7 +180,7 @@ pub fn merge_cfg_structs(
     base: &Stalker2Cfg,
     our: &Stalker2Cfg,
     their: &Stalker2Cfg,
-) -> Result<Stalker2Cfg, Box<dyn std::error::Error>> {
+) -> anyhow::Result<Stalker2Cfg> {
     let base_json = serde_json::to_value(&base)?.to_string();
     let our_json = serde_json::to_value(&our)?.to_string();
     let their_json = serde_json::to_value(&their)?.to_string();

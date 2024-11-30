@@ -164,7 +164,7 @@ fn handle_merge_conflict(
     our_id: git2::Oid,
     their_id: git2::Oid,
     mod_name: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> anyhow::Result<()> {
     let base_blob = repo.find_blob(base_id)?;
     let our_blob = repo.find_blob(our_id)?;
     let their_blob = repo.find_blob(their_id)?;
@@ -234,10 +234,7 @@ fn handle_merge_conflict(
         return Ok(write_and_stage(repo, path, merged_ini.to_string())?);
     }
 
-    Err(Box::new(Error::from_str(&format!(
-        "Failed to resolve conflict for file: {}",
-        path
-    ))))
+    Err(anyhow::anyhow!("Failed to resolve conflict for file: {}", path))
 }
 
 pub fn commit_files(repo: &Repository, message: &str, only_new: bool) -> Result<(), Error> {
