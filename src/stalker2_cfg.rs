@@ -29,15 +29,18 @@ pub struct Stalker2CfgValue {
 pub struct Stalker2Cfg {
     name: String,
     structs: SlotMap<DefaultKey, Stalker2CfgStruct>,
-    root_structs: Vec<DefaultKey>,
+    root_values: Vec<Stalker2CfgValue>,
 }
 
 impl Display for Stalker2Cfg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for struct_key in &self.root_structs {
-            write!(f, "{}", self.struct_to_string(*struct_key, 0))?;
+        for value in &self.root_values {
+            if let Some(value_str) = &value.value {
+                writeln!(f, "{} = {}", value.name, value_str)?;
+            } else if let Some(struct_key) = value.struct_key {
+                write!(f, "{}", self.struct_to_string(struct_key, 0))?;
+            }
         }
-
         Ok(())
     }
 }
@@ -83,7 +86,7 @@ impl Stalker2Cfg {
     }
 
     pub fn from_str(name: String, cfg_str: &str) -> anyhow::Result<Self> {
-        let mut root_structs: Vec<DefaultKey> = Vec::new();
+        let mut root_values: Vec<Stalker2CfgValue> = Vec::new();
         let mut structs: SlotMap<DefaultKey, Stalker2CfgStruct> = SlotMap::new();
         let mut current_struct_key: Option<DefaultKey> = None;
         let mut struct_depth = 0;
@@ -130,7 +133,11 @@ impl Stalker2Cfg {
                 });
 
                 if current_struct_key.is_none() {
-                    root_structs.push(struct_key);
+                    root_values.push(Stalker2CfgValue {
+                        name,
+                        value: None,
+                        struct_key: Some(struct_key),
+                    });
                 } else {
                     let current_struct = structs
                         .get_mut(current_struct_key.expect("We handle none case above"))
@@ -167,17 +174,25 @@ impl Stalker2Cfg {
             }
 
             if let Ok((_, (name, value))) = value_line(line) {
-                let current_struct = structs
-                    .get_mut(current_struct_key.expect(
-                        "By the time we get to a value, we should always have a current struct key",
-                    ))
-                    .expect("Structs are never deleted");
+                if current_struct_key.is_none() {
+                    root_values.push(Stalker2CfgValue {
+                        name,
+                        value: Some(value),
+                        struct_key: None,
+                    });
+                } else {
+                    let current_struct = structs
+                        .get_mut(current_struct_key.expect(
+                            "By the time we get to a value, we should always have a current struct key",
+                        ))
+                        .expect("Structs are never deleted");
 
-                current_struct.values.push(Stalker2CfgValue {
-                    name,
-                    value: Some(value),
-                    struct_key: None,
-                });
+                    current_struct.values.push(Stalker2CfgValue {
+                        name,
+                        value: Some(value),
+                        struct_key: None,
+                    });
+                }
             }
         }
 
@@ -190,7 +205,7 @@ impl Stalker2Cfg {
 
         Ok(Self {
             name,
-            root_structs,
+            root_values,
             structs,
         })
     }
