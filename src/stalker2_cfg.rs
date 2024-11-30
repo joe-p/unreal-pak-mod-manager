@@ -123,6 +123,10 @@ impl Stalker2Cfg {
         for line in cfg_str.lines() {
             line_number += 1;
 
+            if line.trim().starts_with("//") {
+                continue
+            }
+
             if let Ok((_, (name, meta))) = struct_begin(line) {
                 struct_depth += 1;
                 let struct_key = structs.insert(Stalker2CfgStruct {
@@ -193,6 +197,23 @@ impl Stalker2Cfg {
                         struct_key: None,
                     });
                 }
+            }
+            
+
+            if line.contains("struct.begin") {
+                return Err(anyhow::anyhow!(
+                    "Unprocessed struct.begin statement at line {}: {}",
+                    line_number,
+                    line
+                ));
+            }
+
+            if line.contains("struct.end") {
+                return Err(anyhow::anyhow!(
+                    "Unprocessed struct.end statement at line {}: {}",
+                    line_number,
+                    line
+                ));
             }
         }
 

@@ -22,7 +22,7 @@ mods_dir = "mods"
 # For example, "a.pak", "b.pak", and "c.pak" will have priorities 0, 1, and 2 respectively
 # As such, it's recommended to set priorities above 1000 and below -1000 to ensure adding new mods won't affect existing priorities
 
-[mods.blind_dog]
+[mods.pda_tut]
 priority = -2000 # Merge this mod first
 
 [mods."zzzz_Grok_Boar-40pHP_P.pak"]
