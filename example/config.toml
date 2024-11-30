@@ -14,6 +14,11 @@ staging_dir = "staging"
 # - .pak files
 mods_dir = "mods"
 
+# An optional directory to copy the finished pak file to
+# Setting it to your ~mods directory will mean you don't need to manually copy the .pak over each time you build
+# Below is the default Steam install location. Uncomment the line and edit to your install path
+# copy_to_dir = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\S.T.A.L.K.E.R. 2 Heart of Chornobyl\\Stalker2\\Content\\Paks\\~mods"
+
 # mods.<mod_name> allows you to set mod-specific options
 
 # mods.<mod_name>.priority sets the order in which the mods are merged into the final mod pack

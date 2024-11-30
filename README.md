@@ -118,6 +118,8 @@ Press Enter to exit...
 
 6. Move `upmm_modpack.pak` to the `~mods` folder. The default location for Steam installs is `C:\Program Files (x86)\Steam\steamapps\common\S.T.A.L.K.E.R. 2 Heart of Chornobyl\Stalker2\Content\Paks\~mods`
 
+**Note:** You can also use the `copy_to_dir` in the `config.toml` to automate the last step of copying it into `~mods`
+
 ### Configuration
 
 To control the order of mods, the directories used by the program, and the name of the final modpack you can modify the `config.toml`. See [example/config.toml](example/) for an example configuration file that explains all the options (note the mods here are nonsensical and are only for example purposes).

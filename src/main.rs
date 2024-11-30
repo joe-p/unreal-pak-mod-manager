@@ -45,6 +45,11 @@ struct UpmmConfig {
 
     // mods.<mod_name> allows you to set mod-specific options
     mods: Option<HashMap<String, UpmmModConfig>>,
+
+    // The path to copy the .pok to
+    // TODO: Find the installation path. For Steam it's in
+    // HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 1643320 | REG_SZ InstallLocation
+    copy_to_dir: Option<String>
 }
 
 const DEFAULT_CONFIG_FILE: &str = r#"
@@ -65,6 +70,11 @@ staging_dir = "staging"
 mods_dir = "mods"
 
 # mods.<mod_name> allows you to set mod-specific options
+
+# An optional directory to copy the finished pak file to
+# Setting it to your ~mods directory will mean you don't need to manually copy the .pak over each time you build
+# Below is the default Steam install location. Uncomment the line and edit to your install path
+# copy_to_dir = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\S.T.A.L.K.E.R. 2 Heart of Chornobyl\\Stalker2\\Content\\Paks\\~mods"
 
 # mods.<mod_name>.priority sets the order in which the mods are merged into the final mod pack
 # Lower numbers are merged first, meaning changes in mod priority=2 will take priority over changes in mod priority=1
@@ -453,6 +463,23 @@ fn create_modpack(config_path: &std::path::Path) -> Result<()> {
     pak.write_index()?;
 
     println!("{} created successfully!", pak_path.display());
+
+    if config.copy_to_dir.is_some() {
+        let copy_to_dir = PathBuf::from(config.copy_to_dir.expect("should exist because we're in .is_some() branch"));
+        
+        // Create the directory if it doesn't exist
+        fs::create_dir_all(&copy_to_dir)
+            .context(format!("Failed to create directory {}", copy_to_dir.display()))?;
+        
+        // Get the pak filename and create the full destination path
+        let pak_filename = pak_path.file_name()
+            .context("Failed to get pak filename")?;
+        let copy_to_path = copy_to_dir.join(pak_filename);
+        
+        println!("Copying {} to {}", pak_path.display(), copy_to_path.display());
+        fs::copy(&pak_path, &copy_to_path).context("Failed to copy pak file")?;
+    }
+
     Ok(())
 }
 
