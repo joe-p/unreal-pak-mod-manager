@@ -6,49 +6,26 @@ This tool is used to create a single .pak file from a collection of mods for an 
 
 Due to the way unreal games load mods, it's impossible to only take some parts of one mod and combine them with parts of another mod unless you manually unpack the .pak files and repack them. This tool automates this process by automatically unpacking the .pak files, resolving any conflicts between the mods, and repacking them into a single .pak file.
 
-### Features
+## Features
 
+- Single binary with no dependencies
 - Automatically resolves conflicts between STALKER 2 `.cfg` files on a per-value basis
 - Automatically resolves conflicts between `.json` files on a per-value basis
 - Automatically resolves conflicts between Unreal Engine `.ini` files on a per-value basis
 - Attempts to automatically resolve conflicts for all other file types
 
-### Example
-
-Let [example/mods/abc/abc.json](example/mods/abc/abc.json) be a game file that we are modding.
-
-It initially contains the following data:
-
-```json
-{ "a": 1, "b": 2, "c": 3 }
-```
-
-Then we add two mods that each make seperate changes...
-
-[example/mods/increment_b/abc.json](example/mods/increment_b/abc.json) increments `b` by 1:
-
-```json
-{ "a": 1, "b": 3, "c": 3 }
-```
-
-[example/mods/inrement_c/abc.json](example/mods/increment_c/abc.json) increments `c` by 1:
-
-```json
-{ "a": 1, "b": 2, "c": 4 }
-```
-
-If we were to simply load these mods in order, we'd only end up with the changes from the last mod, in this case `increment_c`.
-
-However, if we use this tool to create a modpack, we'd end up with both changes as shown in [example/staging/abc.json](example/staging/abc.json):
-
-```json
-{ "a": 1, "b": 3, "c": 4 }
-```
-
-### Usage
+## Usage
 
 The functionality of this tool is entirely driven by a single toml configuration file that is passed as a command line argument.
 
 See [example/config.toml](example/config.toml) for an example:
 
 Running `cargo run example/config.toml` will then create the modpack with all the mods in [example/mods](example/mods) and pack them in [example/example_modpack.pak](example/example_modpack.pak).
+
+## Why Use This Tool?
+
+The main benefit this tool has over other tools is that it resolves conflicts between mods on a per-value basis, rather than regular (or manual) merge conflict resolution. This makes the merge process more robust and able to handle more complex changes. This also means that non-functional changes, such as changing comments or moving lines, will not affect the outcome of the merge. It also does not have any external dependencies since it is written in Rust and able to use the [repak](https://github.com/trumank/repak) library directly.
+
+## Why No GUI?
+
+I personally don't have much GUI experience and do not want to sink time into creating one where there is still a lot of work to be done on the core functionality. Because this mod tool is a single binary that is driven by a single TOML file anyone is more than welcome to create their own GUI for it using their language of choice or contribute a GUI to this project. The GUI would simply need to read/write the config file and then spawn the tool as a subprocess. Once I am happy with the core functionality, I will begin to create a GUI for it if one has not already been created.
