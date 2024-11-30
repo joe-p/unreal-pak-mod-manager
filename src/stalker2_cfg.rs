@@ -82,7 +82,7 @@ impl Stalker2Cfg {
         result
     }
 
-    pub fn from_str(name: String, cfg_str: &str) -> Stalker2Cfg {
+    pub fn from_str(name: String, cfg_str: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let mut root_structs: Vec<DefaultKey> = Vec::new();
         let mut structs: SlotMap<DefaultKey, Stalker2CfgStruct> = SlotMap::new();
         let mut current_struct_key: Option<DefaultKey> = None;
@@ -168,11 +168,11 @@ impl Stalker2Cfg {
             }
         }
 
-        Self {
+        Ok(Self {
             name,
             root_structs,
             structs,
-        }
+        })
     }
 }
 

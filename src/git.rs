@@ -212,9 +212,9 @@ fn handle_merge_conflict(
     }
 
     if path.ends_with(".cfg") {
-        let base_cfg = Stalker2Cfg::from_str(path.to_string(), &base_buf);
-        let our_cfg = Stalker2Cfg::from_str(path.to_string(), &our_buf);
-        let their_cfg = Stalker2Cfg::from_str(path.to_string(), &their_buf);
+        let base_cfg = Stalker2Cfg::from_str(path.to_string(), &base_buf)?;
+        let our_cfg = Stalker2Cfg::from_str(path.to_string(), &our_buf)?;
+        let their_cfg = Stalker2Cfg::from_str(path.to_string(), &their_buf)?;
 
         let merged_cfg = stalker2_cfg::merge_cfg_structs(&base_cfg, &our_cfg, &their_cfg)?;
 

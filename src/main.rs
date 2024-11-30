@@ -86,7 +86,10 @@ struct Args {
     config_file: Option<String>,
 }
 
-fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) -> Result<(), repak::Error> {
+fn unpak_pak(
+    path: &std::path::Path,
+    output_dir: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error>> {
     let pak = repak::PakBuilder::new().reader(&mut std::io::BufReader::new(File::open(path)?))?;
 
     // Extract each file
@@ -112,15 +115,48 @@ fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) -> Result<(),
             fs::create_dir_all(parent)?;
         }
 
-        // Extract the file
+        // Extract the file to a string first
+        let mut content = Vec::new();
         pak.read_file(
             &entry_path,
             &mut std::io::BufReader::new(File::open(path)?),
-            &mut fs::File::create(&out_path)?,
+            &mut content,
         )?;
+
+        // Normalize and write the content
+        let content_str = String::from_utf8_lossy(&content);
+        let normalized = normalize_content(&out_path, &content_str)?;
+        fs::write(&out_path, normalized)?;
     }
 
     Ok(())
+}
+
+fn normalize_content(
+    path: &std::path::Path,
+    content: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some("json") => {
+            let json: serde_json::Value = serde_json::from_str(&content)?;
+            return Ok(serde_json::to_string_pretty(&json)?);
+        }
+        Some("cfg") => {
+            let cfg = stalker2_cfg::Stalker2Cfg::from_str(
+                path.file_name()
+                    .expect("should always be able to get the filename from the path")
+                    .to_str()
+                    .expect("should always be able to get the str from the filename")
+                    .to_string(),
+                &content,
+            )?;
+
+            return Ok(format!("{}", cfg));
+        }
+        _ => {
+            return Ok(content.to_string());
+        }
+    }
 }
 
 fn process_all_mods_dirs(
@@ -161,18 +197,9 @@ fn process_all_mods_dirs(
                     relative_path.display(),
                 );
 
-                // If the file is a JSON file, normalize it
-                if path.extension().map_or(false, |ext| ext == "json") {
-                    let content = std::fs::read_to_string(&path)?;
-                    let json: serde_json::Value = serde_json::from_str(&content)?;
-                    std::fs::write(
-                        repo_parent.join(relative_path),
-                        serde_json::to_string_pretty(&json)?,
-                    )?;
-                } else {
-                    // Copy the file to the modpack directory
-                    std::fs::copy(path.as_path(), repo_parent.join(relative_path))?;
-                }
+                let content = normalize_content(&path, &std::fs::read_to_string(&path)?)?;
+
+                std::fs::write(repo_parent.join(relative_path), content)?;
             }
         }
 
