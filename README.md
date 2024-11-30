@@ -31,3 +31,33 @@ The main benefit this tool has over other tools is that it resolves conflicts be
 ### Why No GUI?
 
 I personally don't have much GUI experience and do not want to sink time into creating one where there is still a lot of work to be done on the core functionality. Because this mod tool is a single binary that is driven by a single TOML file anyone is more than welcome to create their own GUI for it using their language of choice or contribute a GUI to this project. The GUI would simply need to read/write the config file and then spawn the tool as a subprocess. Once I am happy with the core functionality, I will begin to create a GUI for it if one has not already been created.
+
+### Why Am I Getting An Error About Struct Begin/End?
+
+Some cfg files that are shipped with the game have are *seemingly* malformed. The most common thing is a missing `stuct.end` like in `Stalker2/Content/GameLite/GameData/Scripts/OnGameLaunch/OnGameLaunchScripts_EQ155.cfg`:
+
+
+```
+[0] : struct.begin
+   SID = OnGameLaunchScripts_EQ155
+   ScriptsArray : struct.begin
+      [*] = XSetGlobalBool DBG_IsDebug 1
+      [*] = XStartQuestNodeBySID EQ155_P_Technical_DebugStart
+   struct.end
+```
+
+It's entirely possible that this is the intended syntax of CFG files, but since it's so rare I am missing it is not intentional thus the parser will throw an error when encoutering these files. Since I doubt these are commonly modded files, that seems to be acceptable for now. I have ran this tool against every single file in `pakchunk0` to ensure every file can be parsed properly. Below are the ones that will cause the tool to throw an error:
+
+
+```
+./Stalker2/Content/GameLite/GameData/ArtifactPrototypes/QuestArtifactPrototypes.cfg
+./Stalker2/Content/GameLite/GameData/ItemGeneratorPrototypes/GDItemGeneratorPrototype/VortexDudeItemGenerator.cfg
+./Stalker2/Content/GameLite/GameData/Scripts/OnGameLaunch/OnGameLaunchScripts_E01_MQ01_NoIntro.cfg
+./Stalker2/Content/GameLite/GameData/Scripts/OnGameLaunch/OnGameLaunchScripts_E16_Bossfight_Scar.cfg
+./Stalker2/Content/GameLite/GameData/Scripts/OnGameLaunch/OnGameLaunchScripts_EQ152_Spark.cfg
+./Stalker2/Content/GameLite/GameData/Scripts/OnGameLaunch/OnGameLaunchScripts_EQ152_Ward.cfg
+./Stalker2/Content/GameLite/GameData/Scripts/OnGameLaunch/OnGameLaunchScripts_EQ154.cfg
+./Stalker2/Content/GameLite/GameData/Scripts/OnGameLaunch/OnGameLaunchScripts_EQ155.cfg
+```
+
+If you are using a mod that contains one of these files or encounter similar syntax in the wild please let me know!
