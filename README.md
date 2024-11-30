@@ -16,11 +16,11 @@ Due to the way unreal games load mods, it's impossible to only take some parts o
 
 ## Usage
 
-The functionality of this tool is entirely driven by a single toml configuration file that is passed as a command line argument.
+The functionality of this tool is entirely driven by a single toml configuration file that is passed as a command line argument. If a configuration file is not provided, the tool will create a default config in the current directory and setup the necessary directories.
 
-See [example/config.toml](example/config.toml) for an example:
+For a complete example, see [example/config.toml](example/) for an example configuration and modpack (note the mods here are nonsensical and are only for example purposes):
 
-Running `cargo run example/config.toml` will then create the modpack with all the mods in [example/mods](example/mods) and pack them in [example/example_modpack.pak](example/example_modpack.pak).
+Running `cargo run example/config.toml` from the root of this repository will create the modpack with all the mods in [example/mods](example/mods), stage them in [example/staging](example/staging), and pack them in [example/example_modpack.pak](example/example_modpack.pak).
 
 ## FAQs
 
