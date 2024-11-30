@@ -90,7 +90,7 @@ impl Stalker2Cfg {
         // Parser combinators
         fn struct_begin(input: &str) -> IResult<&str, (String, String)> {
             let (input, _) = multispace0(input)?;
-            let (input, name) = take_till(|c: char| c.is_whitespace())(input)?;
+            let (input, name) = take_till(|c: char| c.is_whitespace() || c == ':')(input)?;
             let (input, _) = multispace0(input)?;
             let (input, _) = tag(":")(input)?;
             let (input, _) = multispace0(input)?;
@@ -107,7 +107,7 @@ impl Stalker2Cfg {
 
         fn value_line(input: &str) -> IResult<&str, (String, String)> {
             let (input, _) = multispace0(input)?;
-            let (input, name) = take_till(|c: char| c.is_whitespace())(input)?;
+            let (input, name) = take_till(|c: char| c.is_whitespace() || c == '=')(input)?;
             let (input, _) = multispace0(input)?;
             let (input, _) = tag("=")(input)?;
             let (input, _) = multispace0(input)?;
