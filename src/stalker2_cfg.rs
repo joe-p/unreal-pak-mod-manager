@@ -124,7 +124,7 @@ impl Stalker2Cfg {
             line_number += 1;
 
             if line.trim().starts_with("//") {
-                continue
+                continue;
             }
 
             if let Ok((_, (name, meta))) = struct_begin(line) {
@@ -198,7 +198,6 @@ impl Stalker2Cfg {
                     });
                 }
             }
-            
 
             if line.contains("struct.begin") {
                 return Err(anyhow::anyhow!(
