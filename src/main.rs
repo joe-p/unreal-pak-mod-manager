@@ -128,8 +128,7 @@ fn unpak_pak(
         )?;
 
         // Normalize and write the content
-        let content_str = String::from_utf8_lossy(&content);
-        let normalized = normalize_content(&out_path, &content_str)?;
+        let normalized = normalize_content(&out_path, &content)?;
         fs::write(&out_path, normalized).context( format!("failed to write to {}", &out_path.to_str().context("Failed to get str from path")?))?;
     }
 
@@ -138,26 +137,29 @@ fn unpak_pak(
 
 fn normalize_content(
     path: &std::path::Path,
-    content: &str,
-) -> Result<String> {
+    content: &Vec<u8>,
+) -> Result<Vec<u8>> {
     match path.extension().and_then(|ext| ext.to_str()) {
         Some("json") => {
-            let json: serde_json::Value = serde_json::from_str(&content)?;
-            Ok(serde_json::to_string_pretty(&json)?)
+            let str_content = String::from_utf8(content.to_vec()).context(format!("non-utf8 bytes found in {}", path.display()))?;
+            let json: serde_json::Value = serde_json::from_str(&str_content)?;
+            Ok(serde_json::to_string_pretty(&json)?.into_bytes())
         }
         Some("cfg") => {
+            let str_content = String::from_utf8(content.to_vec()).context(format!("non-utf8 bytes found in {}", path.display()))?;
+
             let cfg = stalker2_cfg::Stalker2Cfg::from_str(
                 path.file_name()
                     .expect("should always be able to get the filename from the path")
                     .to_str()
                     .expect("should always be able to get the str from the filename")
                     .to_string(),
-                content,
+                &str_content,
             )?;
 
-            Ok(cfg.to_string())
+            Ok(cfg.to_string().into_bytes())
         }
-        _ => Ok(content.to_string())
+        _ => Ok(content.to_vec())
     }
 }
 
@@ -202,7 +204,7 @@ fn process_all_mods_dirs(
                     relative_path.display(),
                 );
 
-                let content = normalize_content(&path, &std::fs::read_to_string(&path)
+                let content = normalize_content(&path, &std::fs::read(&path)
                     .context(format!("Failed to read file '{}'", path.display()))?)?;
 
                 std::fs::write(repo_parent.join(relative_path), content)
