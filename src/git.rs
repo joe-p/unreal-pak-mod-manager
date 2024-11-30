@@ -121,7 +121,7 @@ pub fn merge_branch(
                 let workdir = repo.workdir().expect("Repository has no working directory");
                 let full_path = workdir.join(&path);
                 std::fs::write(&full_path, our_blob.content())
-                    .expect("Failed to write restored file");
+                    .map_err(|e| Error::from_str(&format!("Failed to write restored file {}: {}", path, e)))?;
 
                 let mut index = repo.index()?;
                 index.add_path(Path::new(&path))?;
@@ -193,7 +193,8 @@ fn handle_merge_conflict(
         let full_path = workdir.join(path);
 
         // Write the merged content to the file
-        std::fs::write(&full_path, content + "\n").expect("Failed to write merged content");
+        std::fs::write(&full_path, content + "\n")
+            .map_err(|e| Error::from_str(&format!("Failed to write merged content to {}: {}", path, e)))?;
 
         // Stage the merged file
         let mut index = repo.index()?;

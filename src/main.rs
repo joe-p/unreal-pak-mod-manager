@@ -90,7 +90,9 @@ fn unpak_pak(
     path: &std::path::Path,
     output_dir: &std::path::Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let pak = repak::PakBuilder::new().reader(&mut std::io::BufReader::new(File::open(path)?))?;
+    let pak = repak::PakBuilder::new().reader(&mut std::io::BufReader::new(
+        File::open(path).map_err(|e| format!("Failed to open pak file '{}': {}", path.display(), e))?
+    ))?;
 
     // Extract each file
     for entry_path in pak.files() {
@@ -112,7 +114,8 @@ fn unpak_pak(
 
         // Create parent directories
         if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent)?;
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create directory '{}': {}", parent.display(), e))?;
         }
 
         // Extract the file to a string first
@@ -126,7 +129,7 @@ fn unpak_pak(
         // Normalize and write the content
         let content_str = String::from_utf8_lossy(&content);
         let normalized = normalize_content(&out_path, &content_str)?;
-        fs::write(&out_path, normalized)?;
+        fs::write(&out_path, normalized).map_err(|e| format!("failed to write to {}: {}", &out_path.to_str().unwrap(), e))?;
     }
 
     Ok(())
@@ -169,8 +172,10 @@ fn process_all_mods_dirs(
         root_dir: &std::path::Path,
         repo: &Repository,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        for entry in std::fs::read_dir(dir)? {
-            let path = entry?.path();
+        for entry in std::fs::read_dir(dir)
+            .map_err(|e| format!("Failed to read directory '{}': {}", dir.display(), e))? {
+            let path = entry
+                .map_err(|e| format!("Failed to read directory entry: {}", e))?.path();
 
             if path.is_dir() {
                 process_dir(&path, root_dir, repo)?;
@@ -184,7 +189,8 @@ fn process_all_mods_dirs(
 
                 // Create parent directories
                 if let Some(parent) = repo_parent.join(relative_path).parent() {
-                    fs::create_dir_all(parent)?;
+                    fs::create_dir_all(parent)
+                        .map_err(|e| format!("Failed to create directory '{}': {}", parent.display(), e))?;
                 }
 
                 println!(
@@ -197,16 +203,19 @@ fn process_all_mods_dirs(
                     relative_path.display(),
                 );
 
-                let content = normalize_content(&path, &std::fs::read_to_string(&path)?)?;
+                let content = normalize_content(&path, &std::fs::read_to_string(&path)
+                    .map_err(|e| format!("Failed to read file '{}': {}", path.display(), e))?)?;
 
-                std::fs::write(repo_parent.join(relative_path), content)?;
+                std::fs::write(repo_parent.join(relative_path), content)
+                    .map_err(|e| format!("Failed to write file '{}': {}", relative_path.display(), e))?;
             }
         }
 
         Ok(())
     }
 
-    let mut entries: Vec<_> = std::fs::read_dir(mods_dir)?
+    let mut entries: Vec<_> = std::fs::read_dir(mods_dir)
+        .map_err(|e| format!("Failed to read mods directory '{}': {}", mods_dir.display(), e))?
         .filter_map(Result::ok)
         .collect();
 
@@ -309,7 +318,8 @@ fn process_all_mods_dirs(
 }
 
 fn create_modpack(config_path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-    let config_contents = std::fs::read_to_string(config_path).expect("Failed to read config file");
+    let config_contents = std::fs::read_to_string(config_path)
+        .map_err(|e| format!("Failed to read config file '{}': {}", config_path.display(), e))?;
     let config: UpmmConfig = toml::from_str(&config_contents)?;
 
     // Get the config file's directory
@@ -326,7 +336,8 @@ fn create_modpack(config_path: &std::path::Path) -> Result<(), Box<dyn std::erro
             .expect("Failed to delete modpack directory");
     }
 
-    std::fs::create_dir_all(full_staging_dir.clone()).expect("Failed to create modpack directory");
+    std::fs::create_dir_all(full_staging_dir.clone())
+        .map_err(|e| format!("Failed to create modpack directory '{}': {}", full_staging_dir.display(), e))?;
 
     let repo: Repository = git::init_repository(full_staging_dir.to_str().unwrap())
         .expect("Failed to initialize modpack repository");
@@ -335,9 +346,10 @@ fn create_modpack(config_path: &std::path::Path) -> Result<(), Box<dyn std::erro
     let full_mods_dir = config_dir.join(mods_dir);
 
     if !full_mods_dir.exists() {
-        println!("Mods directory does not exist, creating it...");
-        std::fs::create_dir_all(&full_mods_dir)?;
-        let absolute_mods_dir: PathBuf = fs::canonicalize(&full_mods_dir)?;
+        std::fs::create_dir_all(&full_mods_dir)
+            .map_err(|e| format!("Failed to create mods directory '{}': {}", full_mods_dir.display(), e))?;
+        let absolute_mods_dir: PathBuf = fs::canonicalize(&full_mods_dir)
+            .map_err(|e| format!("Failed to get absolute path for '{}': {}", full_mods_dir.display(), e))?;
 
         println!(
             "Created mods directory, put pak files here and run this program again to create a modpack: {}",
@@ -425,4 +437,7 @@ fn main() {
     };
 
     create_modpack(&config_path).expect("Failed to create modpack");
+
+    println!("Press Enter to exit...");
+    std::io::stdin().read_line(&mut String::new()).unwrap();
 }
