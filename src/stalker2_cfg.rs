@@ -86,6 +86,8 @@ impl Stalker2Cfg {
         let mut root_structs: Vec<DefaultKey> = Vec::new();
         let mut structs: SlotMap<DefaultKey, Stalker2CfgStruct> = SlotMap::new();
         let mut current_struct_key: Option<DefaultKey> = None;
+        let mut struct_depth = 0;
+        let mut line_number: i32 = 0;
 
         // Parser combinators
         fn struct_begin(input: &str) -> IResult<&str, (String, String)> {
@@ -116,7 +118,10 @@ impl Stalker2Cfg {
         }
 
         for line in cfg_str.lines() {
+            line_number += 1;
+
             if let Ok((_, (name, meta))) = struct_begin(line) {
+                struct_depth += 1;
                 let struct_key = structs.insert(Stalker2CfgStruct {
                     name: name.clone(),
                     meta,
@@ -143,6 +148,14 @@ impl Stalker2Cfg {
             }
 
             if struct_end(line).is_ok() {
+                struct_depth -= 1;
+                if struct_depth < 0 {
+                    return Err(anyhow::anyhow!(
+                        "Found struct.end without matching struct.begin at line {}",
+                        line_number
+                    ));
+                }
+
                 let current_struct = structs
                     .get_mut(current_struct_key.expect(
                         "By the time we get to struct.end, we should always have a current struct key",
@@ -166,6 +179,13 @@ impl Stalker2Cfg {
                     struct_key: None,
                 });
             }
+        }
+
+        if struct_depth > 0 {
+            return Err(anyhow::anyhow!(
+                "Found {} unclosed struct.begin statements at end of file",
+                struct_depth
+            ));
         }
 
         Ok(Self {
