@@ -7,10 +7,10 @@ use std::{
     path::PathBuf,
 };
 
+use anyhow::{Context, Result};
 use clap::Parser;
 use git2::Repository;
 use path_slash::PathExt as _;
-use anyhow::{Context, Result};
 
 pub mod git;
 pub mod merge;
@@ -87,12 +87,10 @@ struct Args {
     config_file: Option<String>,
 }
 
-fn unpak_pak(
-    path: &std::path::Path,
-    output_dir: &std::path::Path,
-) -> Result<()> {
+fn unpak_pak(path: &std::path::Path, output_dir: &std::path::Path) -> Result<()> {
     let pak = repak::PakBuilder::new().reader(&mut std::io::BufReader::new(
-        File::open(path).with_context(|| format!("Failed to open pak file '{}'", path.display()))?
+        File::open(path)
+            .with_context(|| format!("Failed to open pak file '{}'", path.display()))?,
     ))?;
 
     // Extract each file
@@ -129,24 +127,26 @@ fn unpak_pak(
 
         // Normalize and write the content
         let normalized = normalize_content(&out_path, &content)?;
-        fs::write(&out_path, normalized).context( format!("failed to write to {}", &out_path.to_str().context("Failed to get str from path")?))?;
+        fs::write(&out_path, normalized).context(format!(
+            "failed to write to {}",
+            &out_path.to_str().context("Failed to get str from path")?
+        ))?;
     }
 
     Ok(())
 }
 
-fn normalize_content(
-    path: &std::path::Path,
-    content: &Vec<u8>,
-) -> Result<Vec<u8>> {
+fn normalize_content(path: &std::path::Path, content: &Vec<u8>) -> Result<Vec<u8>> {
     match path.extension().and_then(|ext| ext.to_str()) {
         Some("json") => {
-            let str_content = String::from_utf8(content.to_vec()).context(format!("non-utf8 bytes found in {}", path.display()))?;
+            let str_content = String::from_utf8(content.to_vec())
+                .context(format!("non-utf8 bytes found in {}", path.display()))?;
             let json: serde_json::Value = serde_json::from_str(&str_content)?;
             Ok(serde_json::to_string_pretty(&json)?.into_bytes())
         }
         Some("cfg") => {
-            let str_content = String::from_utf8(content.to_vec()).context(format!("non-utf8 bytes found in {}", path.display()))?;
+            let str_content = String::from_utf8(content.to_vec())
+                .context(format!("non-utf8 bytes found in {}", path.display()))?;
 
             let cfg = stalker2_cfg::Stalker2Cfg::from_str(
                 path.file_name()
@@ -159,7 +159,7 @@ fn normalize_content(
 
             Ok(cfg.to_string().into_bytes())
         }
-        _ => Ok(content.to_vec())
+        _ => Ok(content.to_vec()),
     }
 }
 
@@ -174,9 +174,11 @@ fn process_all_mods_dirs(
         repo: &Repository,
     ) -> Result<()> {
         for entry in std::fs::read_dir(dir)
-            .with_context(|| format!("Failed to read directory '{}'", dir.display()))? {
+            .with_context(|| format!("Failed to read directory '{}'", dir.display()))?
+        {
             let path = entry
-                .with_context(|| "Failed to read directory entry")?.path();
+                .with_context(|| "Failed to read directory entry")?
+                .path();
 
             if path.is_dir() {
                 process_dir(&path, root_dir, repo)?;
@@ -190,8 +192,9 @@ fn process_all_mods_dirs(
 
                 // Create parent directories
                 if let Some(parent) = repo_parent.join(relative_path).parent() {
-                    fs::create_dir_all(parent)
-                        .with_context(|| format!("Failed to create directory '{}'", parent.display()))?;
+                    fs::create_dir_all(parent).with_context(|| {
+                        format!("Failed to create directory '{}'", parent.display())
+                    })?;
                 }
 
                 println!(
@@ -204,11 +207,16 @@ fn process_all_mods_dirs(
                     relative_path.display(),
                 );
 
-                let content = normalize_content(&path, &std::fs::read(&path)
-                    .context(format!("Failed to read file '{}'", path.display()))?)?;
+                let content = normalize_content(
+                    &path,
+                    &std::fs::read(&path)
+                        .context(format!("Failed to read file '{}'", path.display()))?,
+                )?;
 
-                std::fs::write(repo_parent.join(relative_path), content)
-                    .context(format!("Failed to write file '{}'", relative_path.display()))?;
+                std::fs::write(repo_parent.join(relative_path), content).context(format!(
+                    "Failed to write file '{}'",
+                    relative_path.display()
+                ))?;
             }
         }
 
@@ -337,20 +345,36 @@ fn create_modpack(config_path: &std::path::Path) -> Result<()> {
             .with_context(|| format!("Failed to delete modpack directory"))?;
     }
 
-    std::fs::create_dir_all(full_staging_dir.clone())
-        .with_context(|| format!("Failed to create modpack directory '{}'", full_staging_dir.display()))?;
+    std::fs::create_dir_all(full_staging_dir.clone()).with_context(|| {
+        format!(
+            "Failed to create modpack directory '{}'",
+            full_staging_dir.display()
+        )
+    })?;
 
-    let repo: Repository = git::init_repository(full_staging_dir.to_str().context("Failed to get staging dir str")?)
-        .expect("Failed to initialize modpack repository");
+    let repo: Repository = git::init_repository(
+        full_staging_dir
+            .to_str()
+            .context("Failed to get staging dir str")?,
+    )
+    .expect("Failed to initialize modpack repository");
 
     let mods_dir = config.mods_dir.clone();
     let full_mods_dir = config_dir.join(mods_dir);
 
     if !full_mods_dir.exists() {
-        std::fs::create_dir_all(&full_mods_dir)
-            .with_context(|| format!("Failed to create mods directory '{}'", full_mods_dir.display()))?;
-        let absolute_mods_dir: PathBuf = fs::canonicalize(&full_mods_dir)
-            .with_context(|| format!("Failed to get absolute path for '{}'", full_mods_dir.display()))?;
+        std::fs::create_dir_all(&full_mods_dir).with_context(|| {
+            format!(
+                "Failed to create mods directory '{}'",
+                full_mods_dir.display()
+            )
+        })?;
+        let absolute_mods_dir: PathBuf = fs::canonicalize(&full_mods_dir).with_context(|| {
+            format!(
+                "Failed to get absolute path for '{}'",
+                full_mods_dir.display()
+            )
+        })?;
 
         println!(
             "Created mods directory, put pak files here and run this program again to create a modpack: {}",
@@ -376,7 +400,12 @@ fn create_modpack(config_path: &std::path::Path) -> Result<()> {
 
     let name = config.name;
     let pak_path = config_dir.join(format!("{}.pak", name));
-    let pak_name = pak_path.file_name().context("Failed to get pak file name")?.to_str().context("Failed to get file str")?.to_owned();
+    let pak_name = pak_path
+        .file_name()
+        .context("Failed to get pak file name")?
+        .to_str()
+        .context("Failed to get file str")?
+        .to_owned();
     let mut pak = repak::PakBuilder::new().writer(
         BufWriter::new(File::create(&pak_path).expect("Failed to create pak file")),
         repak::Version::V8B,
@@ -410,8 +439,15 @@ fn create_modpack(config_path: &std::path::Path) -> Result<()> {
         let file_path = path.strip_prefix(&full_staging_dir)?;
         let path_slash = file_path.to_slash().context("Failed to get slash")?;
         println!("{}: Packing {}", pak_name, path_slash);
-        pak.write_file(&path_slash, fs::read(&path).expect(&format!("Failed to read {}", path.display())))
-            .expect(&format!("Failed to write {} to {}", path_slash, path.display()));
+        pak.write_file(
+            &path_slash,
+            fs::read(&path).expect(&format!("Failed to read {}", path.display())),
+        )
+        .expect(&format!(
+            "Failed to write {} to {}",
+            path_slash,
+            path.display()
+        ));
     }
 
     pak.write_index()?;
@@ -459,4 +495,3 @@ fn main() {
         std::process::exit(1);
     }
 }
-

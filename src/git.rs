@@ -120,8 +120,9 @@ pub fn merge_branch(
                 let our_blob = repo.find_blob(our_id)?;
                 let workdir = repo.workdir().expect("Repository has no working directory");
                 let full_path = workdir.join(&path);
-                std::fs::write(&full_path, our_blob.content())
-                    .map_err(|e| Error::from_str(&format!("Failed to write restored file {}: {}", path, e)))?;
+                std::fs::write(&full_path, our_blob.content()).map_err(|e| {
+                    Error::from_str(&format!("Failed to write restored file {}: {}", path, e))
+                })?;
 
                 let mut index = repo.index()?;
                 index.add_path(Path::new(&path))?;
@@ -193,8 +194,12 @@ fn handle_merge_conflict(
         let full_path = workdir.join(path);
 
         // Write the merged content to the file
-        std::fs::write(&full_path, content + "\n")
-            .map_err(|e| Error::from_str(&format!("Failed to write merged content to {}: {}", path, e)))?;
+        std::fs::write(&full_path, content + "\n").map_err(|e| {
+            Error::from_str(&format!(
+                "Failed to write merged content to {}: {}",
+                path, e
+            ))
+        })?;
 
         // Stage the merged file
         let mut index = repo.index()?;
@@ -234,7 +239,10 @@ fn handle_merge_conflict(
         return Ok(write_and_stage(repo, path, merged_ini.to_string())?);
     }
 
-    Err(anyhow::anyhow!("Failed to resolve conflict for file: {}", path))
+    Err(anyhow::anyhow!(
+        "Failed to resolve conflict for file: {}",
+        path
+    ))
 }
 
 pub fn commit_files(repo: &Repository, message: &str, only_new: bool) -> Result<(), Error> {
