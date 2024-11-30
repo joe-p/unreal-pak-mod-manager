@@ -95,13 +95,12 @@ impl Stalker2Cfg {
         // Parser combinators
         fn struct_begin(input: &str) -> IResult<&str, (String, String)> {
             let (input, _) = multispace0(input)?;
-            let (input, name) = take_till(|c: char| c.is_whitespace() || c == ':')(input)?;
-            let (input, _) = multispace0(input)?;
+            let (input, name) = take_till(|c: char| c == ':')(input)?;
             let (input, _) = tag(":")(input)?;
             let (input, _) = multispace0(input)?;
             let (input, _) = tag("struct.begin")(input)?;
             let (input, meta) = not_line_ending(input)?;
-            Ok((input, (name.to_string(), meta.to_string())))
+            Ok((input, (name.trim().to_string(), meta.to_string())))
         }
 
         fn struct_end(input: &str) -> IResult<&str, ()> {
@@ -112,12 +111,11 @@ impl Stalker2Cfg {
 
         fn value_line(input: &str) -> IResult<&str, (String, String)> {
             let (input, _) = multispace0(input)?;
-            let (input, name) = take_till(|c: char| c.is_whitespace() || c == '=')(input)?;
-            let (input, _) = multispace0(input)?;
+            let (input, name) = take_till(|c: char| c == '=')(input)?;
             let (input, _) = tag("=")(input)?;
             let (input, _) = multispace0(input)?;
             let (input, value) = not_line_ending(input)?;
-            Ok((input, (name.to_string(), value.to_string())))
+            Ok((input, (name.trim().to_string(), value.to_string())))
         }
 
         for line in cfg_str.lines() {
