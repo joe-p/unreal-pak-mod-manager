@@ -22,10 +22,12 @@ See [example/config.toml](example/config.toml) for an example:
 
 Running `cargo run example/config.toml` will then create the modpack with all the mods in [example/mods](example/mods) and pack them in [example/example_modpack.pak](example/example_modpack.pak).
 
-## Why Use This Tool?
+## FAQs
 
-The main benefit this tool has over other tools is that it resolves conflicts between mods on a per-value basis, rather than regular (or manual) merge conflict resolution. This makes the merge process more robust and able to handle more complex changes. This also means that non-functional changes, such as changing comments or moving lines, will not affect the outcome of the merge. It also does not have any external dependencies since it is written in Rust and able to use the [repak](https://github.com/trumank/repak) library directly.
+### Why Use This Tool?
 
-## Why No GUI?
+The main benefit this tool has over other tools is that it resolves conflicts between mods on a per-value basis rather than regular (or manual) merge conflict resolution. This makes the merge process more robust and able to handle more complex changes. This also means that non-functional changes, such as changing comments or moving lines, will not affect the outcome of the merge. It also does not have any external dependencies since it is written in Rust and able to use the [repak](https://github.com/trumank/repak) library directly.
+
+### Why No GUI?
 
 I personally don't have much GUI experience and do not want to sink time into creating one where there is still a lot of work to be done on the core functionality. Because this mod tool is a single binary that is driven by a single TOML file anyone is more than welcome to create their own GUI for it using their language of choice or contribute a GUI to this project. The GUI would simply need to read/write the config file and then spawn the tool as a subprocess. Once I am happy with the core functionality, I will begin to create a GUI for it if one has not already been created.
