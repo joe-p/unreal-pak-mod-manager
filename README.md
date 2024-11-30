@@ -34,7 +34,7 @@ I personally don't have much GUI experience and do not want to sink time into cr
 
 ### Why Am I Getting An Error About Struct Begin/End?
 
-Some cfg files that are shipped with the game have are *seemingly* malformed. The most common thing is a missing `stuct.end` like in `Stalker2/Content/GameLite/GameData/Scripts/OnGameLaunch/OnGameLaunchScripts_EQ155.cfg`:
+Some cfg files that are shipped with the game are *seemingly* malformed. The most common thing is a missing `stuct.end` like in `Stalker2/Content/GameLite/GameData/Scripts/OnGameLaunch/OnGameLaunchScripts_EQ155.cfg`:
 
 
 ```
