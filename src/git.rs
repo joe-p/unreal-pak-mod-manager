@@ -276,7 +276,7 @@ pub fn commit_files(repo: &Repository, message: &str, only_new: bool) -> Result<
     let parent_commit = head.peel_to_commit()?;
 
     // Create the commit
-    let signature = repo.signature()?;
+    let signature = git2::Signature::now("Strelok", "The Zone")?;
     repo.commit(
         Some("HEAD"),
         &signature,
